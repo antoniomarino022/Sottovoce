@@ -12,7 +12,7 @@ from src.agents import (
     run_prosecution_agent,
 )
 from src.models import CoinTransaction, Confession, Reaction, User
-from src.models.enums import ModerationStatus, TxType
+from src.models.enums import ModerationStatus, ShameBadge, TxType
 from src.schemas import ConfessionCreate
 from src.services.redis_service import (
     get_cache,
@@ -25,6 +25,8 @@ logger = logging.getLogger(__name__)
 
 COST_DEFENSE = 20
 COST_PROSECUTION = 20
+COST_ESCALATE = 10
+ESCALATION_AI_THRESHOLDS = frozenset({1, 5, 10})
 FEED_CACHE_TTL_SECONDS = 20
 
 FeedType = Literal["latest", "popular", "my"]
@@ -37,6 +39,7 @@ class _AgentInput(NamedTuple):
     content: str
     ai_roast: str
     ai_defense: Optional[str]
+    escalation_count: int
 
 
 def _not_found(what: str) -> HTTPException:
@@ -138,8 +141,103 @@ def get_user_reactions_map(
     return {cid: r_type for cid, r_type in rows}
 
 
-# Backward-compatible internal alias
 _get_user_reactions = get_user_reactions_map
+
+
+def get_court_counts_map(
+    session: Session,
+    confession_ids: list[int],
+) -> dict[int, tuple[int, int]]:
+    """Batch-fetch (defense_count, prosecution_count) per confession in 1 SQL GROUP BY."""
+    if not confession_ids:
+        return {}
+    rows = session.exec(
+        select(
+            CoinTransaction.target_confession_id,
+            CoinTransaction.tx_type,
+            sa.func.count(),
+        )
+        .where(
+            col(CoinTransaction.target_confession_id).in_(confession_ids),
+            col(CoinTransaction.tx_type).in_(
+                [TxType.BUY_AI_LAWYER, TxType.BUY_AI_PROSECUTOR]
+            ),
+        )
+        .group_by(CoinTransaction.target_confession_id, CoinTransaction.tx_type)
+    ).all()
+
+    counts: dict[int, list[int]] = {}
+    for cid, tx_type, cnt in rows:
+        if cid is None:
+            continue
+        pair = counts.setdefault(cid, [0, 0])
+        if tx_type == TxType.BUY_AI_LAWYER:
+            pair[0] = int(cnt)
+        elif tx_type == TxType.BUY_AI_PROSECUTOR:
+            pair[1] = int(cnt)
+    return {cid: (pair[0], pair[1]) for cid, pair in counts.items()}
+
+
+def get_user_court_votes_map(
+    session: Session,
+    user_id: int,
+    confession_ids: list[int],
+) -> dict[int, tuple[bool, bool]]:
+    """Batch-fetch (user_defended, user_prosecuted) for the current user."""
+    if not confession_ids:
+        return {}
+    rows = session.exec(
+        select(CoinTransaction.target_confession_id, CoinTransaction.tx_type).where(
+            CoinTransaction.user_id == user_id,
+            col(CoinTransaction.target_confession_id).in_(confession_ids),
+            col(CoinTransaction.tx_type).in_(
+                [TxType.BUY_AI_LAWYER, TxType.BUY_AI_PROSECUTOR]
+            ),
+        )
+    ).all()
+
+    votes: dict[int, list[bool]] = {}
+    for cid, tx_type in rows:
+        if cid is None:
+            continue
+        pair = votes.setdefault(cid, [False, False])
+        if tx_type == TxType.BUY_AI_LAWYER:
+            pair[0] = True
+        elif tx_type == TxType.BUY_AI_PROSECUTOR:
+            pair[1] = True
+    return {cid: (pair[0], pair[1]) for cid, pair in votes.items()}
+
+
+def _has_user_voted_side(
+    session: Session,
+    user_id: int,
+    confession_id: int,
+    tx_type: TxType,
+) -> bool:
+    existing = session.exec(
+        select(CoinTransaction.id)
+        .where(
+            CoinTransaction.user_id == user_id,
+            CoinTransaction.target_confession_id == confession_id,
+            CoinTransaction.tx_type == tx_type,
+        )
+        .limit(1)
+    ).first()
+    return existing is not None
+
+
+def _apply_court_badge(
+    confession: Confession,
+    defense_count: int,
+    prosecution_count: int,
+) -> None:
+    """Update shame_stamp automatically as prosecution/defense escalates."""
+    if prosecution_count >= 5 and prosecution_count > defense_count:
+        confession.shame_stamp = ShameBadge.CERTIFIED_CLOWN
+    elif prosecution_count >= 3 and prosecution_count > defense_count:
+        confession.shame_stamp = ShameBadge.WALKING_RED_FLAG
+    elif defense_count >= 5 and defense_count >= prosecution_count:
+        confession.shame_stamp = ShameBadge.NONE
 
 
 def _is_author(author_id: Optional[int], current_user_id: Optional[int]) -> bool:
@@ -150,6 +248,8 @@ def serialize_confession(
     confession: Confession,
     user_reaction: Any = None,
     current_user_id: Optional[int] = None,
+    court_counts: Optional[tuple[int, int]] = None,
+    user_votes: Optional[tuple[bool, bool]] = None,
 ) -> dict[str, Any]:
     """Convert a confession ORM object to a template/API dict."""
     total = confession.total_reactions
@@ -161,11 +261,20 @@ def serialize_confession(
             + confession.count_clown
         )
 
+    raw_def, raw_pros = court_counts or (0, 0)
+    def_count = max(raw_def, 1 if confession.ai_defense else 0)
+    pros_count = max(raw_pros, 1 if confession.ai_prosecution else 0)
+    u_def, u_pros = user_votes or (False, False)
+
     return {
         **confession.model_dump(),
         "total_reactions": total,
         "user_reaction": user_reaction,
         "is_author": _is_author(confession.author_id, current_user_id),
+        "defense_count": def_count,
+        "prosecution_count": pros_count,
+        "user_defended": u_def,
+        "user_prosecuted": u_pros,
     }
 
 
@@ -193,7 +302,6 @@ async def create_confession_service(
 
         if confession.id is not None:
             cid = confession.id
-            # Release any open transaction before the 2-6s external LLM call
             session.commit()
             result = await run_confession_pipeline(
                 content=content_text,
@@ -234,7 +342,7 @@ async def delete_confession_service(
 
 
 # --------------------------------------------------------------------------- #
-# AI pipeline & courtroom powers
+# AI pipeline & courtroom powers (with Escalation)
 # --------------------------------------------------------------------------- #
 async def process_confession_ai_pipeline(
     session: Session,
@@ -280,34 +388,71 @@ async def _invoke_agent(
     user_id: Optional[int] = None,
     *,
     label: str,
-    cost: int,
+    base_cost: int,
     tx_type: TxType,
     field: str,
+    duplicate_msg: str,
     runner: Callable[[_AgentInput], Awaitable[dict]],
 ) -> Confession:
-    """Validate, release DB transaction, run LLM, then atomically charge + save."""
+    """Unlock (20 coins) or escalate (10 coins) Defense/Prosecution.
+
+    LLM runs ONLY on 1st unlock and at escalation thresholds (5, 10); intermediate
+    joiners execute in <30ms with zero LLM cost while incrementing the court tally.
+    """
     with db_errors(session, f"invoke {label} agent"):
         confession = _get_active_confession(session, confession_id)
         _validate_confession_for_agent(confession, label)
+
+        if user_id is not None and _has_user_voted_side(
+            session, user_id, confession_id, tx_type
+        ):
+            raise _bad_request(duplicate_msg)
+
+        counts = get_court_counts_map(session, [confession_id]).get(
+            confession_id, (0, 0)
+        )
+        def_cnt = max(counts[0], 1 if confession.ai_defense else 0)
+        pros_cnt = max(counts[1], 1 if confession.ai_prosecution else 0)
+
+        already_unlocked = bool(getattr(confession, field))
+        current_side_count = def_cnt if field == "ai_defense" else pros_cnt
+        next_count = current_side_count + 1
+        cost = COST_ESCALATE if already_unlocked else base_cost
+
         if user_id is not None:
             _ensure_can_afford(session, user_id, cost)
 
-        # Snapshot primitives BEFORE commit so no lazy SELECT re-opens a transaction
-        snapshot = _AgentInput(
-            confession_id=confession_id,
-            content=confession.content,
-            ai_roast=confession.ai_roast or "",
-            ai_defense=confession.ai_defense,
-        )
-        session.commit()
+        needs_llm = (not already_unlocked) or (next_count in ESCALATION_AI_THRESHOLDS)
+        new_text: Optional[str] = None
 
-        result = await runner(snapshot)
+        if needs_llm:
+            snapshot = _AgentInput(
+                confession_id=confession_id,
+                content=confession.content,
+                ai_roast=confession.ai_roast or "",
+                ai_defense=confession.ai_defense,
+                escalation_count=next_count,
+            )
+            session.commit()
 
-        confession = _get_active_confession(session, confession_id)
+            result = await runner(snapshot)
+            new_text = result.get(field)
+            confession = _get_active_confession(session, confession_id)
+
         if user_id is not None:
+            if needs_llm and _has_user_voted_side(
+                session, user_id, confession_id, tx_type
+            ):
+                raise _bad_request(duplicate_msg)
             _charge_user(session, user_id, cost, tx_type, confession_id)
 
-        setattr(confession, field, result.get(field))
+        if new_text:
+            setattr(confession, field, new_text)
+
+        new_def = next_count if field == "ai_defense" else def_cnt
+        new_pros = next_count if field == "ai_prosecution" else pros_cnt
+        _apply_court_badge(confession, new_def, new_pros)
+
         session.add(confession)
         session.commit()
         _refresh_if_expired(session, confession)
@@ -326,13 +471,15 @@ async def invoke_defense_service(
         confession_id,
         user_id,
         label="defense",
-        cost=COST_DEFENSE,
+        base_cost=COST_DEFENSE,
         tx_type=TxType.BUY_AI_LAWYER,
         field="ai_defense",
+        duplicate_msg="Hai già sostenuto la difesa per questo segreto.",
         runner=lambda inp: run_defense_agent(
             confession_id=inp.confession_id,
             content=inp.content,
             ai_roast=inp.ai_roast,
+            escalation_count=inp.escalation_count,
         ),
     )
 
@@ -347,14 +494,16 @@ async def invoke_prosecution_service(
         confession_id,
         user_id,
         label="prosecution",
-        cost=COST_PROSECUTION,
+        base_cost=COST_PROSECUTION,
         tx_type=TxType.BUY_AI_PROSECUTOR,
         field="ai_prosecution",
+        duplicate_msg="Hai già accusato questo segreto.",
         runner=lambda inp: run_prosecution_agent(
             confession_id=inp.confession_id,
             content=inp.content,
             ai_roast=inp.ai_roast,
             ai_defense=inp.ai_defense,
+            escalation_count=inp.escalation_count,
         ),
     )
 
@@ -367,15 +516,26 @@ async def get_confession_by_id_service(
     confession_id: int,
     current_user_id: Optional[int] = None,
 ) -> dict[str, Any]:
-    """Single confession with total reactions and the current user's reaction."""
+    """Single confession with reactions and courtroom escalation tallies."""
     confession = _get_active_confession(session, confession_id)
+    court_counts = get_court_counts_map(session, [confession_id]).get(confession_id)
 
     user_reaction = None
+    user_votes = None
     if current_user_id is not None:
         reactions = get_user_reactions_map(session, current_user_id, [confession_id])
         user_reaction = reactions.get(confession_id)
+        user_votes = get_user_court_votes_map(
+            session, current_user_id, [confession_id]
+        ).get(confession_id)
 
-    return serialize_confession(confession, user_reaction, current_user_id)
+    return serialize_confession(
+        confession,
+        user_reaction=user_reaction,
+        current_user_id=current_user_id,
+        court_counts=court_counts,
+        user_votes=user_votes,
+    )
 
 
 async def _feed_cache_key(
@@ -432,7 +592,12 @@ async def _load_feed_items(
 
     query = _build_feed_query(feed_type, current_user_id)
     confessions = session.exec(query.offset(offset).limit(limit)).all()
-    items = [serialize_confession(c) for c in confessions]
+    ids = [c.id for c in confessions if c.id is not None]
+    court_counts = get_court_counts_map(session, ids)
+    items = [
+        serialize_confession(c, court_counts=court_counts.get(c.id or -1))
+        for c in confessions
+    ]
     await set_cache(cache_key, items, ttl_seconds=FEED_CACHE_TTL_SECONDS)
     return items
 
@@ -444,21 +609,25 @@ async def get_feed_confessions_service(
     offset: int = 0,
     current_user_id: Optional[int] = None,
 ) -> list[dict[str, Any]]:
-    """Feed with aggregate reaction totals and the user's own reactions, cached via Redis."""
+    """Feed with aggregate reactions/court tallies and current user's personal state."""
     with db_errors(session, "fetch feed"):
         items = await _load_feed_items(
             session, feed_type, limit, offset, current_user_id
         )
 
         reactions_by_confession: dict[int, Any] = {}
+        votes_by_confession: dict[int, tuple[bool, bool]] = {}
         if current_user_id is not None and items:
             ids = [item["id"] for item in items if item.get("id") is not None]
             reactions_by_confession = get_user_reactions_map(session, current_user_id, ids)
+            votes_by_confession = get_user_court_votes_map(session, current_user_id, ids)
 
         return [
             {
                 **item,
                 "user_reaction": reactions_by_confession.get(item["id"]),
+                "user_defended": votes_by_confession.get(item["id"], (False, False))[0],
+                "user_prosecuted": votes_by_confession.get(item["id"], (False, False))[1],
                 "is_author": _is_author(item.get("author_id"), current_user_id),
             }
             for item in items

@@ -77,6 +77,10 @@ class ConfessionResponse(BaseModel):
     severity: int
     ai_defense: Optional[str] = None
     ai_prosecution: Optional[str] = None
+    defense_count: int = 0
+    prosecution_count: int = 0
+    user_defended: bool = False
+    user_prosecuted: bool = False
     visual_style: PostStyle
     shame_stamp: ShameBadge
     pinned_until: Optional[datetime] = None

@@ -1,29 +1,17 @@
 {% extends "base.html" %}
-{% from "macros/ui.html" import icon, bottom_nav %}
+{% from "macros/ui.html" import icon, bottom_nav, header_wallet %}
 
 {% block title %}Sottovoce — Classifiche Settimanali{% endblock %}
 
 {% block content %}
 <div class="flex-1 flex flex-col">
   <!-- Sticky Header -->
-  <header class="sticky top-0 z-30 bg-header border-b border-sep px-4 h-12 flex items-center justify-between">
-    <div class="flex items-center gap-2">
+  <header class="sticky top-0 z-30 bg-header border-b border-sep px-4 h-12 flex items-center justify-between gap-2">
+    <div class="flex items-center gap-2 min-w-0">
       <span class="text-xl">🏆</span>
-      <h1 class="font-semibold text-text text-[17px] tracking-tight">Classifiche Settimanali</h1>
+      <h1 class="font-semibold text-text text-[17px] tracking-tight truncate">Classifiche</h1>
     </div>
-    <div class="flex items-center gap-2 text-xs">
-      <button
-        id="ad-reward-btn"
-        type="button"
-        onclick="watchRewardedAd()"
-        class="flex items-center gap-1 font-semibold text-accent-text bg-secondary px-2.5 py-1 rounded-lg active:bg-press transition-colors"
-        title="Guarda un'ad per ricevere 20 monete"
-      >
-        <span>🎬</span>
-        <span>+20 🪙</span>
-      </button>
-      <span id="user-coins-display" class="user-coins-display text-hint font-medium">{{ user.coins_balance if user else 0 }} 🪙</span>
-    </div>
+    {{ header_wallet(user) }}
   </header>
 
   <!-- Rewards Banner -->

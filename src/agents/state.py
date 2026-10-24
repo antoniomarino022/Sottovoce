@@ -47,6 +47,7 @@ class ConfessionState(TypedDict, total=False):
     ai_roast: Optional[str]
     ai_defense: Optional[str]
     ai_prosecution: Optional[str]
+    escalation_count: int
     active_powers: list[str]
     guardrails_triggered: list[str]
     messages: Annotated[list[BaseMessage], add_messages]

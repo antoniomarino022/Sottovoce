@@ -367,11 +367,61 @@ if (!window.__sottovoce_initialized) {
 syncNavigationState();
 
 // ---------------------------------------------------------------------------
-// 3. Telegram Share & Adsgram Rewarded Video
+// 3. Telegram Share (+20 Coins) & Adsgram Rewarded Video
 // ---------------------------------------------------------------------------
+function getReferralCode() {
+  return document.getElementById("user-coins-display")?.dataset?.referral || "";
+}
+
+function updateCoinsUI(balance) {
+  if (typeof balance !== "number") return;
+  document.querySelectorAll(".user-coins-display").forEach((el) => {
+    el.textContent = `${balance} 🪙`;
+  });
+}
+
+function openTelegramShare(shareUrl, shareText) {
+  const tgShareLink = `https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareText)}`;
+  if (tg?.openTelegramLink) {
+    tg.openTelegramLink(tgShareLink);
+  } else {
+    window.open(tgShareLink, "_blank", "noopener,noreferrer");
+  }
+}
+
+window.shareGame = function () {
+  const bot = window.BOT_USERNAME || "SottovoceBot";
+  const ref = getReferralCode();
+  const shareUrl = `https://t.me/${bot}/app${ref ? `?startapp=${encodeURIComponent(ref)}` : ""}`;
+  const shareText = "Vieni su Sottovoce: confessioni anonime giudicate senza pietà da una Corte AI! 🤫⚖️";
+
+  openTelegramShare(shareUrl, shareText);
+
+  fetch("/ads/share", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(tg?.initData ? { "X-Telegram-Init-Data": tg.initData } : {}),
+    },
+  })
+    .then((r) => r.json())
+    .then((data) => {
+      updateCoinsUI(data?.coins_balance);
+      if (data?.rewarded) {
+        tg?.HapticFeedback?.notificationOccurred("success");
+      }
+    })
+    .catch(() => {});
+};
+
 window.shareConfession = function (id, snippet) {
-  const shareText = `Guarda questo segreto anonimo su Sottovoce! 🤫\n\n"${snippet}"\n\nScopri di più:`;
-  const shareUrl = `https://t.me/${window.BOT_USERNAME || "SottovoceBot"}/app?startapp=confession_${id}`;
+  const bot = window.BOT_USERNAME || "SottovoceBot";
+  const ref = getReferralCode();
+  const startParam = ref ? `c${id}_${ref}` : `confession_${id}`;
+  const shareText = `Guarda questo segreto anonimo su Sottovoce! 🤫\n\n"${snippet}"\n\nScopri il verdetto della Corte:`;
+  const shareUrl = `https://t.me/${bot}/app?startapp=${encodeURIComponent(startParam)}`;
+
+  openTelegramShare(shareUrl, shareText);
 
   fetch(`/confessions/${id}/share`, {
     method: "POST",
@@ -382,26 +432,24 @@ window.shareConfession = function (id, snippet) {
     .then((r) => r.json())
     .then((data) => {
       const el = document.getElementById(`shares-count-${id}`);
-      if (el && data.shares_count) el.textContent = data.shares_count;
+      if (el && data?.shares_count) el.textContent = data.shares_count;
+      updateCoinsUI(data?.coins_balance);
+      if (data?.rewarded) {
+        tg?.HapticFeedback?.notificationOccurred("success");
+      }
     })
     .catch(() => {});
-
-  const tgShareLink = `https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareText)}`;
-  if (tg?.openTelegramLink) {
-    tg.openTelegramLink(tgShareLink);
-  } else {
-    window.open(tgShareLink, "_blank", "noopener,noreferrer");
-  }
 };
 
 let adsgramController = null;
 
 function getAdsgramController() {
   if (adsgramController) return adsgramController;
-  if (window.Adsgram && window.ADSGRAM_BLOCK_ID) {
+  const blockId = String(window.ADSGRAM_BLOCK_ID || "55863").trim();
+  if (window.Adsgram && blockId) {
     try {
       adsgramController = window.Adsgram.init({
-        blockId: window.ADSGRAM_BLOCK_ID,
+        blockId,
         debug: false,
       });
     } catch (e) {
@@ -426,9 +474,7 @@ window.watchRewardedAd = function () {
       .then(async (res) => {
         const data = await res.json().catch(() => null);
         if (res.ok) {
-          document.querySelectorAll(".user-coins-display").forEach((el) => {
-            el.textContent = `${data.coins_balance} 🪙`;
-          });
+          updateCoinsUI(data?.coins_balance);
           tg?.HapticFeedback?.notificationOccurred("success");
           showNativeAlert(data?.message || "Hai guadagnato 20 monete! 🪙");
         } else {
@@ -451,16 +497,19 @@ window.watchRewardedAd = function () {
     controller
       .show()
       .then(claimReward)
-      .catch(() => {
+      .catch((result) => {
         if (btn) btn.disabled = false;
         tg?.HapticFeedback?.notificationOccurred("warning");
+        showNativeAlert(
+          result?.description ||
+            "Guarda il video fino alla fine per ricevere le 20 monete, o riprova tra poco."
+        );
       });
   } else {
-    const origText = btn ? btn.innerHTML : "";
-    if (btn) btn.innerHTML = "<span>⏳</span><span>Caricamento...</span>";
-    setTimeout(() => {
-      if (btn) btn.innerHTML = origText;
-      claimReward();
-    }, 1500);
+    if (btn) btn.disabled = false;
+    tg?.HapticFeedback?.notificationOccurred("warning");
+    showNativeAlert(
+      "Annuncio Adsgram non disponibile al momento. Riprova tra qualche secondo."
+    );
   }
 };

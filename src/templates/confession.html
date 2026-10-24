@@ -6,24 +6,12 @@
 {% block content %}
 <div class="flex-1 flex flex-col w-full">
   <!-- Sticky Header -->
-  <header class="sticky top-0 z-10 h-12 bg-header border-b border-sep flex items-center justify-between px-4">
-    <div class="flex items-center gap-2">
+  <header class="sticky top-0 z-10 h-12 bg-header border-b border-sep flex items-center justify-between gap-2 px-4">
+    <div class="flex items-center gap-2 min-w-0">
       <span class="text-accent">{{ ui.icon("lock", cls="size-4") }}</span>
-      <span class="text-[17px] font-medium text-text">Sottovoce</span>
+      <span class="text-[17px] font-medium text-text truncate">Sottovoce</span>
     </div>
-    <div class="flex items-center gap-2">
-      <button
-        id="ad-reward-btn"
-        type="button"
-        onclick="watchRewardedAd()"
-        class="flex items-center gap-1 text-xs font-semibold text-accent-text bg-secondary px-2.5 py-1 rounded-lg active:bg-press transition-colors"
-        title="Guarda un'ad per ricevere 20 monete"
-      >
-        <span>🎬</span>
-        <span>+20 🪙</span>
-      </button>
-      <span id="user-coins-display" class="user-coins-display text-xs text-hint font-medium">{{ user.coins_balance if user else 0 }} 🪙</span>
-    </div>
+    {{ ui.header_wallet(user) }}
   </header>
 
   <!-- Content Container -->

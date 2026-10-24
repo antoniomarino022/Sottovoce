@@ -1,6 +1,6 @@
 from functools import lru_cache
 import os
-from pydantic import Field, SecretStr
+from pydantic import AliasChoices, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -48,8 +48,9 @@ class Settings(BaseSettings):
         description="Public URL for Telegram Mini App",
     )
     ADSGRAM_BLOCK_ID: str = Field(
-        default="",
-        description="Adsgram Block ID for rewarded ads (e.g. 1234 or your Adsgram placement ID)",
+        default="55863",
+        validation_alias=AliasChoices("ADSGRAM_BLOCK_ID", "BLOCK_ID"),
+        description="Adsgram Block ID for rewarded ads (accepts ADSGRAM_BLOCK_ID or BLOCK_ID)",
     )
 
     @property

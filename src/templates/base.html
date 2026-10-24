@@ -5,11 +5,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <script src="https://sad.adsgram.ai/js/sad.min.js" async></script>
+  <script src="https://sad.adsgram.ai/js/sad.min.js" defer></script>
   <link rel="stylesheet" href="{{ url_for('static', path='app.css') }}">
   <script>
     window.BOT_USERNAME = "{{ bot_username or 'SottovoceBot' }}";
-    window.ADSGRAM_BLOCK_ID = "{{ adsgram_block_id or '' }}";
+    window.ADSGRAM_BLOCK_ID = "{{ adsgram_block_id or '55863' }}";
   </script>
   <script src="{{ url_for('static', path='htmx.min.js') }}" defer></script>
   <script src="{{ url_for('static', path='tg.js') }}" defer></script>

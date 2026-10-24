@@ -143,12 +143,14 @@ async def run_defense_agent(
     confession_id: ConfessionId = None,
     content: str = "",
     ai_roast: Optional[str] = None,
+    escalation_count: int = 1,
 ) -> dict[str, Any]:
     """Invoke the defense attorney agent on demand (stateless, no checkpoint I/O)."""
     state: ConfessionState = {
         "confession_id": confession_id,
         "content": content,
         "ai_roast": ai_roast,
+        "escalation_count": escalation_count,
         "active_powers": [POWER_LAWYER],
     }
     return await _get_graphs().defense.ainvoke(state)
@@ -159,6 +161,7 @@ async def run_prosecution_agent(
     content: str = "",
     ai_roast: Optional[str] = None,
     ai_defense: Optional[str] = None,
+    escalation_count: int = 1,
 ) -> dict[str, Any]:
     """Invoke the prosecutor agent on demand (stateless, no checkpoint I/O)."""
     state: ConfessionState = {
@@ -166,6 +169,7 @@ async def run_prosecution_agent(
         "content": content,
         "ai_roast": ai_roast,
         "ai_defense": ai_defense,
+        "escalation_count": escalation_count,
         "active_powers": [POWER_PROSECUTOR],
     }
     return await _get_graphs().prosecution.ainvoke(state)

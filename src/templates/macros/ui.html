@@ -29,6 +29,38 @@
 </div>
 {% endmacro %}
 
+{% macro header_wallet(user=None) %}
+<div class="flex items-center gap-1.5 text-xs shrink-0">
+  <button
+    id="share-game-btn"
+    type="button"
+    onclick="shareGame()"
+    data-haptic
+    class="flex items-center gap-1 font-semibold text-accent-text bg-secondary px-2 py-1 rounded-lg active:bg-press transition-colors"
+    title="Condividi Sottovoce e ricevi 20 monete"
+  >
+    {{ icon("send", "size-3.5") }}
+    <span>+20 🪙</span>
+  </button>
+  <button
+    id="ad-reward-btn"
+    type="button"
+    onclick="watchRewardedAd()"
+    data-haptic
+    class="flex items-center gap-1 font-semibold text-accent-text bg-secondary px-2 py-1 rounded-lg active:bg-press transition-colors"
+    title="Guarda un'ad per ricevere 20 monete"
+  >
+    <span>🎬</span>
+    <span>+20 🪙</span>
+  </button>
+  <span
+    id="user-coins-display"
+    data-referral="{{ user.referral_code if user and user.referral_code else '' }}"
+    class="user-coins-display text-xs text-hint font-medium pl-0.5"
+  >{{ user.coins_balance if user else 0 }} 🪙</span>
+</div>
+{% endmacro %}
+
 {% macro bottom_nav(active_tab="feed") %}
 <nav id="bottom-bar" class="fixed bottom-0 inset-x-0 bg-bg border-t border-sep z-40 flex items-center justify-around h-14 pb-[env(safe-area-inset-bottom)] select-none">
   <a href="/" data-tab="feed" hx-push-url="true" data-haptic class="bottom-nav-item flex flex-col items-center justify-center flex-1 h-full py-1 active:opacity-60 transition-colors {{ 'text-accent-text font-semibold' if active_tab == 'feed' else 'text-hint' }}">

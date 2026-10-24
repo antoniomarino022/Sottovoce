@@ -10,7 +10,10 @@ from fastapi import HTTPException, status
 from sqlmodel import Session, select
 
 from config.settings import settings
-from src.models import User, UserStatus
+from src.models import CoinTransaction, User, UserStatus
+from src.models.enums import TxType
+
+REFERRAL_INVITE_REWARD = 20
 
 
 class TelegramAuthService:
@@ -96,22 +99,41 @@ class TelegramAuthService:
             return user, False
 
         referred_by_id = None
+        referrer: Optional[User] = None
         if referral_code:
+            clean_code = referral_code.strip()
+            if "_" in clean_code:
+                clean_code = clean_code.rsplit("_", 1)[-1]
             referrer = session.exec(
-                select(User).where(User.referral_code == referral_code.strip().upper())
+                select(User).where(User.referral_code == clean_code.upper())
             ).first()
-            if referrer:
+            if referrer and referrer.id is not None:
                 referred_by_id = referrer.id
 
+        now = datetime.now(timezone.utc)
         user = User(
             user_key=user_key,
             status=UserStatus.ACTIVE,
             coins_balance=50,
             referral_code=cls.generate_unique_referral_code(session),
             referred_by_id=referred_by_id,
-            terms_accepted_at=datetime.now(timezone.utc),
+            referral_qualified_at=now if referred_by_id is not None else None,
+            terms_accepted_at=now,
         )
         session.add(user)
+
+        if referrer and referrer.id is not None:
+            referrer.coins_balance += REFERRAL_INVITE_REWARD
+            session.add(referrer)
+            session.add(
+                CoinTransaction(
+                    user_id=referrer.id,
+                    amount=REFERRAL_INVITE_REWARD,
+                    balance_after=referrer.coins_balance,
+                    tx_type=TxType.REFERRAL_BONUS,
+                )
+            )
+
         session.commit()
         session.refresh(user)
         return user, True

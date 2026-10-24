@@ -179,6 +179,16 @@ async def defense_node(state: ConfessionState) -> dict[str, Any]:
     if "ai_lawyer" not in (state.get("active_powers") or []):
         return {"ai_defense": None}
 
+    count = int(state.get("escalation_count") or 1)
+    if count >= 5:
+        instruction = (
+            f"Ben {count} cittadini si sono schierati a difesa dell'imputato! "
+            "Deposita un ricorso supremo in Cassazione ancora più assurdo, trionfale e spudorato. "
+            "Scrivi solo la battuta difensiva, senza prefissi."
+        )
+    else:
+        instruction = "Scrivi solo la tua battuta difensiva, senza prefissi."
+
     return await _run_persona(
         "defense",
         defense_prompt,
@@ -186,6 +196,7 @@ async def defense_node(state: ConfessionState) -> dict[str, Any]:
         output_key="ai_defense",
         content=state.get("content", ""),
         ai_roast=state.get("ai_roast") or "",
+        escalation_instruction=instruction,
     )
 
 
@@ -193,6 +204,22 @@ async def prosecution_node(state: ConfessionState) -> dict[str, Any]:
     """Prosecution requisition, only when the 'ai_prosecutor' power is active."""
     if "ai_prosecutor" not in (state.get("active_powers") or []):
         return {"ai_prosecution": None}
+
+    count = int(state.get("escalation_count") or 1)
+    if count >= 10:
+        instruction = (
+            f"Folla inferocita: {count} cittadini reclamano una condanna esemplare! "
+            "Emetti la requisitoria finale da ergastolo popolare più apocalittica e sproporzionata possibile. "
+            "Scrivi solo la battuta d'accusa, senza prefissi."
+        )
+    elif count >= 5:
+        instruction = (
+            f"Ben {count} cittadini hanno rincarato l'accusa contro l'imputato! "
+            "Aggrava la requisitoria chiedendo una pena ancora più spietata e assurda. "
+            "Scrivi solo la battuta d'accusa, senza prefissi."
+        )
+    else:
+        instruction = "Scrivi solo la tua battuta d'accusa, senza prefissi."
 
     return await _run_persona(
         "prosecution",
@@ -202,6 +229,7 @@ async def prosecution_node(state: ConfessionState) -> dict[str, Any]:
         content=state.get("content", ""),
         ai_roast=state.get("ai_roast") or "",
         ai_defense=state.get("ai_defense") or NO_DEFENSE_PLACEHOLDER,
+        escalation_instruction=instruction,
     )
 
 

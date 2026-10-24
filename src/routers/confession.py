@@ -12,7 +12,9 @@ from src.services.confession_service import (
     create_confession_service,
     delete_confession_service,
     get_confession_by_id_service,
+    get_court_counts_map,
     get_feed_confessions_service,
+    get_user_court_votes_map,
     get_user_reactions_map,
     invoke_defense_service,
     invoke_prosecution_service,
@@ -36,30 +38,46 @@ def _is_htmx(request: Request) -> bool:
     return bool(request.headers.get("hx-request"))
 
 
+def _build_card_dict(
+    session: Session,
+    confession: Confession,
+    user_id: Optional[int],
+) -> dict:
+    cid = confession.id
+    if cid is None:
+        return serialize_confession(confession, current_user_id=user_id)
+
+    court_counts = get_court_counts_map(session, [cid]).get(cid)
+    user_reaction = None
+    user_votes = None
+    if user_id is not None:
+        user_reaction = get_user_reactions_map(session, user_id, [cid]).get(cid)
+        user_votes = get_user_court_votes_map(session, user_id, [cid]).get(cid)
+
+    return serialize_confession(
+        confession,
+        user_reaction=user_reaction,
+        current_user_id=user_id,
+        court_counts=court_counts,
+        user_votes=user_votes,
+    )
+
+
 def _render_card(
     request: Request,
     session: Session,
     confession: Confession,
     user: User,
 ) -> Response:
-    """Render the updated confession card directly without re-querying Confession/User."""
+    """Render the updated confession card directly with refreshed user balance & court tallies."""
     user_state = sa.inspect(user, raiseerr=False)
-    if user_state is not None and user_state.expired:
+    if user_state is not None and user_state.persistent:
         try:
             session.refresh(user)
         except Exception:
             pass
 
-    user_reaction = None
-    if user.id is not None and confession.id is not None:
-        reactions = get_user_reactions_map(session, user.id, [confession.id])
-        user_reaction = reactions.get(confession.id)
-
-    c_dict = serialize_confession(
-        confession,
-        user_reaction=user_reaction,
-        current_user_id=user.id,
-    )
+    c_dict = _build_card_dict(session, confession, user.id)
     response = templates.TemplateResponse(
         request=request,
         name="partials/confession_card.html",
@@ -158,7 +176,7 @@ async def invoke_defense(
     )
     if _is_htmx(request):
         return _render_card(request, session, confession, current_user)
-    return ConfessionResponse.model_validate(confession)
+    return ConfessionResponse.model_validate(_build_card_dict(session, confession, user_id))
 
 
 @router.post(
@@ -177,4 +195,4 @@ async def invoke_prosecution(
     )
     if _is_htmx(request):
         return _render_card(request, session, confession, current_user)
-    return ConfessionResponse.model_validate(confession)
+    return ConfessionResponse.model_validate(_build_card_dict(session, confession, user_id))

@@ -72,7 +72,7 @@ class TestFeaturesAndRedis(unittest.TestCase):
                 referral_code="REF303",
                 terms_accepted_at=datetime.now(timezone.utc),
                 status=UserStatus.ACTIVE,
-                coins_balance=10,  # Low balance for testing
+                coins_balance=5,  # Low balance (< 10 escalation cost) for testing
             )
             session.add(self.user1)
             session.add(self.user2)
@@ -188,13 +188,85 @@ class TestFeaturesAndRedis(unittest.TestCase):
                 u1 = session.get(User, self.u1_id)
                 self.assertEqual(u1.coins_balance, 60)
 
-        # Test user with insufficient coins (User 3 has only 10 coins)
+        # Test user with insufficient coins (User 3 has only 5 coins, joining costs 10)
         client_poor = TestClient(app, cookies={"sottovoce_session": "key_user_three"})
         with patch("src.agents.nodes.creative_llm") as mock_creative:
             mock_creative.ainvoke = AsyncMock(return_value=AIMessage(content="Test"))
             res_fail = client_poor.post(f"/confessions/{self.cid}/defense")
             self.assertEqual(res_fail.status_code, 400)
             self.assertIn("insufficiente", res_fail.json()["detail"].lower())
+
+    def test_court_escalation_five_prosecutors(self):
+        """Test 5 users accusing a confession: 1st pays 20 + AI, 2nd-4th pay 10 + 0 AI, 5th pays 10 + Aggravated AI + badge."""
+        extra_keys = []
+        with Session(sqlite_engine) as session:
+            for idx in (4, 5, 6):
+                key = f"key_user_{idx}"
+                extra_keys.append(key)
+                session.add(
+                    User(
+                        telegram_id=40000 + idx,
+                        user_key=key,
+                        referral_code=f"REF40{idx}",
+                        terms_accepted_at=datetime.now(timezone.utc),
+                        status=UserStatus.ACTIVE,
+                        coins_balance=50,
+                    )
+                )
+            session.commit()
+
+        prosecutor_keys = ["key_user_one", "key_user_two", *extra_keys]
+
+        with patch("src.agents.nodes.creative_llm") as mock_creative:
+            mock_creative.ainvoke = AsyncMock(
+                side_effect=[
+                    AIMessage(content="Chiedo 100 ore di lavori socialmente inutili!"),
+                    AIMessage(content="Cinque cittadini chiedono l'esilio perpetuo su Marte!"),
+                ]
+            )
+
+            # 1° accusatore: paga 20 monete e sblocca la 1ª Requisitoria AI
+            c1 = TestClient(app, cookies={"sottovoce_session": prosecutor_keys[0]})
+            r1 = c1.post(f"/confessions/{self.cid}/prosecution")
+            self.assertEqual(r1.status_code, 200)
+            self.assertEqual(r1.json()["prosecution_count"], 1)
+            self.assertTrue(r1.json()["user_prosecuted"])
+            self.assertEqual(mock_creative.ainvoke.call_count, 1)
+
+            # Doppio click dello stesso utente bloccato senza addebiti
+            r_dup = c1.post(f"/confessions/{self.cid}/prosecution")
+            self.assertEqual(r_dup.status_code, 400)
+
+            # 2°, 3°, 4° accusatore: pagano 10 monete ciascuno, ZERO chiamate AI
+            for expected_cnt, key in enumerate(prosecutor_keys[1:4], start=2):
+                c = TestClient(app, cookies={"sottovoce_session": key})
+                resp = c.post(f"/confessions/{self.cid}/prosecution")
+                self.assertEqual(resp.status_code, 200)
+                self.assertEqual(resp.json()["prosecution_count"], expected_cnt)
+            self.assertEqual(mock_creative.ainvoke.call_count, 1)
+
+            # Verifica saldo 2° utente (100 - 10 = 90)
+            with Session(sqlite_engine) as session:
+                u2 = session.get(User, self.u2_id)
+                self.assertEqual(u2.coins_balance, 90)
+
+            # 5° accusatore: paga 10 monete, scatta l'Escalation AI Aggravata + badge Condannato!
+            c5 = TestClient(app, cookies={"sottovoce_session": prosecutor_keys[4]})
+            r5 = c5.post(f"/confessions/{self.cid}/prosecution")
+            self.assertEqual(r5.status_code, 200)
+            body5 = r5.json()
+            self.assertEqual(body5["prosecution_count"], 5)
+            self.assertIn("Marte", body5["ai_prosecution"])
+            self.assertEqual(body5["shame_stamp"], "certified_clown")
+            self.assertEqual(mock_creative.ainvoke.call_count, 2)
+
+            # Cosa vedono tutti gli altri utenti nel feed HTML
+            viewer = TestClient(app, cookies={"sottovoce_session": "key_user_three"})
+            feed_html = viewer.get("/").text
+            self.assertIn("Condannato (5)", feed_html)
+            self.assertIn("Requisitoria Aggravata", feed_html)
+            self.assertIn("5 accusatori", feed_html)
+            self.assertIn("Rincara Accusa (10 🪙)", feed_html)
 
     def test_redis_cache_and_rate_limit(self):
         """Test Redis/in-memory cache helper and sliding window rate limiting."""

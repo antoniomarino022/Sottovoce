@@ -117,7 +117,7 @@ defense_prompt: ChatPromptTemplate = ChatPromptTemplate.from_messages(
         HumanMessagePromptTemplate.from_template(
             "<confessione>\n{content}\n</confessione>\n\n"
             "<battuta_del_giudice>\n{ai_roast}\n</battuta_del_giudice>\n\n"
-            "Scrivi solo la tua battuta difensiva, senza prefissi."
+            "{escalation_instruction}"
         ),
     ]
 )
@@ -129,7 +129,7 @@ prosecution_prompt: ChatPromptTemplate = ChatPromptTemplate.from_messages(
             "<confessione>\n{content}\n</confessione>\n\n"
             "<battuta_del_giudice>\n{ai_roast}\n</battuta_del_giudice>\n\n"
             "<battuta_della_difesa>\n{ai_defense}\n</battuta_della_difesa>\n\n"
-            "Scrivi solo la tua battuta d'accusa, senza prefissi."
+            "{escalation_instruction}"
         ),
     ]
 )

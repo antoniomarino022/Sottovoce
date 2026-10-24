@@ -7,7 +7,11 @@ from sqlmodel import Session
 from config.database import get_session
 from src.models import User
 from src.routers.deps import get_current_user
-from src.services.ad_service import COOLDOWN_SECONDS, claim_ad_reward_service
+from src.services.ad_service import (
+    COOLDOWN_SECONDS,
+    claim_ad_reward_service,
+    claim_share_reward_service,
+)
 
 logger = logging.getLogger("sottovoce.ad_router")
 
@@ -31,6 +35,25 @@ async def claim_ad_reward(
         user_id=current_user.id,
     )
     return result
+
+
+@router.post("/share", status_code=status.HTTP_200_OK)
+async def claim_share_reward(
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """Claim +20 coins reward for sharing the Sottovoce Mini App on Telegram."""
+    if current_user.id is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Autenticazione richiesta",
+        )
+
+    return await claim_share_reward_service(
+        session=session,
+        user_id=current_user.id,
+        confession_id=None,
+    )
 
 
 @router.get("/status", status_code=status.HTTP_200_OK)
