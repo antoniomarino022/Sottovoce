@@ -11,6 +11,7 @@ if sys.platform == "win32":
 import asyncio
 from contextlib import asynccontextmanager
 import logging
+from pathlib import Path
 
 import anyio
 from fastapi import FastAPI
@@ -88,7 +89,8 @@ app = FastAPI(
 app.add_middleware(GZipMiddleware, minimum_size=500)
 
 # Static assets with 1-day Cache-Control
-app.mount("/static", CachedStaticFiles(directory="src/static"), name="static")
+_STATIC_DIR = Path(__file__).resolve().parent / "src" / "static"
+app.mount("/static", CachedStaticFiles(directory=str(_STATIC_DIR)), name="static")
 
 # UI Pages (SSR + HTMX partials) & JSON API Routers
 app.include_router(pages_router)

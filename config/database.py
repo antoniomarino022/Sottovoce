@@ -4,7 +4,14 @@ from sqlmodel import Session, SQLModel, create_engine
 
 from config.settings import settings
 
-database_url = settings.DATABASE_URL.get_secret_value()
+raw_url = settings.DATABASE_URL.get_secret_value().strip()
+if raw_url.startswith("postgres://"):
+    database_url = raw_url.replace("postgres://", "postgresql+psycopg://", 1)
+elif raw_url.startswith("postgresql://"):
+    database_url = raw_url.replace("postgresql://", "postgresql+psycopg://", 1)
+else:
+    database_url = raw_url or "sqlite:///:memory:"
+
 is_postgres = database_url.startswith("postgresql")
 
 connect_args = {"connect_timeout": 3} if is_postgres else {}
