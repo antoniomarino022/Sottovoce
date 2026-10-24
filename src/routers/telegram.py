@@ -51,7 +51,12 @@ async def set_telegram_webhook() -> dict[str, Any]:
         )
 
     bot = get_bot()
-    endpoint = f"{webhook_url.rstrip('/')}/telegram/webhook"
+    base_url = webhook_url.rstrip("/")
+    endpoint = (
+        base_url
+        if base_url.endswith("/telegram/webhook")
+        else f"{base_url}/telegram/webhook"
+    )
     success = await bot.set_webhook(url=endpoint)
     info = await bot.get_webhook_info()
     return {"success": success, "webhook_url": endpoint, "info": info.model_dump()}

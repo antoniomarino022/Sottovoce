@@ -8,7 +8,7 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message, W
 from config.settings import settings
 
 TOKEN = settings.TELEGRAM_BOT_TOKEN.get_secret_value()
-WEBAPP_URL = settings.WEBAPP_URL or "https://sottovoce.vercel.app"
+WEBAPP_URL = settings.WEBAPP_URL or "https://sottovoce-sable.vercel.app"
 
 dp = Dispatcher()
 

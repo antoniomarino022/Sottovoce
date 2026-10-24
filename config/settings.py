@@ -40,11 +40,11 @@ class Settings(BaseSettings):
         description="Telegram bot username (without @) for Mini App deep links",
     )
     TELEGRAM_WEBHOOK_URL: str = Field(
-        default="",
+        default="https://sottovoce-sable.vercel.app",
         description="Public URL endpoint for Telegram webhook on Vercel",
     )
     WEBAPP_URL: str = Field(
-        default="https://sottovoce.vercel.app",
+        default="https://sottovoce-sable.vercel.app",
         description="Public URL for Telegram Mini App",
     )
     ADSGRAM_BLOCK_ID: str = Field(
