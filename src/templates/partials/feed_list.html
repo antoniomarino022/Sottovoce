@@ -1,0 +1,33 @@
+{% if confessions and confessions | length > 0 %}
+  <div class="flex flex-col gap-3">
+    {% for c in confessions %}
+      {% include "partials/confession_card.html" %}
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="flex flex-col items-center justify-center py-12 px-4 text-center">
+    <div class="size-14 rounded-full bg-secondary flex items-center justify-center text-hint text-2xl mb-3">
+      🤫
+    </div>
+    <div class="text-[17px] font-medium text-text mb-1">
+      {% if filter == 'my' %}
+        Nessuna confessione ancora
+      {% else %}
+        Il silenzio regna nella Corte
+      {% endif %}
+    </div>
+    <p class="text-sm text-hint max-w-xs mb-4">
+      {% if filter == 'my' %}
+        Non hai ancora confessato nulla. I tuoi segreti sono completamente anonimi e al sicuro.
+      {% else %}
+        Non ci sono ancora confessioni da giudicare. Sii il primo ad andare al patibolo!
+      {% endif %}
+    </p>
+    <a
+      href="/confession"
+      class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-accent text-on-accent text-sm font-medium active:opacity-80"
+    >
+      <span>✍️</span> <span>Scrivi una confessione</span>
+    </a>
+  </div>
+{% endif %}

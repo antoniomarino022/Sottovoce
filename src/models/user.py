@@ -10,7 +10,6 @@ from src.models.enums import UserStatus, pg_enum
 if TYPE_CHECKING:
     from src.models.confession import Confession
     from src.models.coin_transaction import CoinTransaction
-    from src.models.poll_vote import PollVote
     from src.models.reaction import Reaction
     from src.models.report import Report
 
@@ -81,6 +80,14 @@ class User(SQLModel, table=True):
         default=None,
         sa_column=Column(sa.DateTime(timezone=True), nullable=True),
     )
+    last_ad_watched_at: Optional[datetime] = Field(
+        default=None,
+        sa_column=Column(sa.DateTime(timezone=True), nullable=True),
+    )
+    ads_watched_count: int = Field(
+        default=0,
+        sa_column=Column(sa.Integer, nullable=False, server_default="0"),
+    )
     terms_accepted_at: datetime = Field(
         sa_column=Column(sa.DateTime(timezone=True), nullable=False),
     )
@@ -112,10 +119,6 @@ class User(SQLModel, table=True):
         sa_relationship_kwargs={"cascade": "all, delete-orphan"},
     )
     reactions: list["Reaction"] = Relationship(
-        back_populates="user",
-        sa_relationship_kwargs={"cascade": "all, delete-orphan"},
-    )
-    poll_votes: list["PollVote"] = Relationship(
         back_populates="user",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"},
     )

@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% from "macros/ui.html" import icon, bottom_nav %}
+
+{% block title %}Hot-Mic — Classifiche Settimanali{% endblock %}
+
+{% block content %}
+<div class="flex-1 flex flex-col">
+  <!-- Sticky Header -->
+  <header class="sticky top-0 z-30 bg-header border-b border-sep px-4 h-12 flex items-center justify-between">
+    <div class="flex items-center gap-2">
+      <span class="text-xl">🏆</span>
+      <h1 class="font-semibold text-text text-[17px] tracking-tight">Classifiche Settimanali</h1>
+    </div>
+    <div class="flex items-center gap-2 text-xs">
+      <button
+        id="ad-reward-btn"
+        type="button"
+        onclick="watchRewardedAd()"
+        class="flex items-center gap-1 font-semibold text-accent-text bg-secondary px-2.5 py-1 rounded-lg active:bg-press transition-colors"
+        title="Guarda un'ad per ricevere 20 monete"
+      >
+        <span>🎬</span>
+        <span>+20 🪙</span>
+      </button>
+      <span id="user-coins-display" class="user-coins-display text-hint font-medium">{{ user.coins_balance if user else 0 }} 🪙</span>
+    </div>
+  </header>
+
+  <!-- Rewards Banner -->
+  <div class="px-4 py-2 bg-secondary border-b border-sep text-xs text-hint flex items-center justify-between">
+    <div class="flex items-center gap-1.5 text-text font-medium">
+      <span>🎁 Premi Podio:</span>
+      <span class="text-accent-text font-semibold">🥇 200 🪙 · 🥈 150 🪙 · 🥉 100 🪙</span>
+    </div>
+  </div>
+
+  <!-- Segmented Control for 2 Leaderboards -->
+  <div class="px-4 py-2.5 bg-bg border-b border-sep sticky top-12 z-20">
+    <div class="flex items-center bg-secondary p-1 rounded-xl text-xs font-medium">
+      <a
+        href="/leaderboard?type=secrets"
+        hx-get="/leaderboard?type=secrets"
+        hx-target="#leaderboard-list"
+        hx-swap="innerHTML"
+        hx-push-url="true"
+        class="leaderboard-tab flex-1 py-1.5 text-center rounded-lg transition-all {{ 'bg-bg text-text shadow-sm font-semibold' if active_type == 'secrets' or not active_type else 'text-hint active:text-text' }}"
+      >
+        🔥 Top 10 Segreti
+      </a>
+      <a
+        href="/leaderboard?type=shares"
+        hx-get="/leaderboard?type=shares"
+        hx-target="#leaderboard-list"
+        hx-swap="innerHTML"
+        hx-push-url="true"
+        class="leaderboard-tab flex-1 py-1.5 text-center rounded-lg transition-all {{ 'bg-bg text-text shadow-sm font-semibold' if active_type == 'shares' else 'text-hint active:text-text' }}"
+      >
+        🚀 Top 10 Condivisioni
+      </a>
+    </div>
+  </div>
+
+  <!-- Leaderboard Content -->
+  <section class="flex-1 px-4 py-3">
+    <div id="leaderboard-list">
+      {% include "partials/leaderboard_list.html" %}
+    </div>
+  </section>
+</div>
+{% endblock %}
+
+{% block nav %}
+{{ bottom_nav(active_tab='leaderboard') }}
+{% endblock %}

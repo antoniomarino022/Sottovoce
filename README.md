@@ -145,7 +145,6 @@ La persistenza si appoggia su **Neon PostgreSQL**, sfruttando il connection pool
 ```mermaid
 erDiagram
     USER ||--o{ CONFESSION : "pubblica (1:N)"
-    CONFESSION ||--o| POLL : "contiene (1:1 opzionale)"
 
    -- Estensione per generare UUID v4 (nativa in PG 13+, ma utile per compatibilità)
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
@@ -186,8 +185,6 @@ CREATE TYPE reaction_type AS ENUM (
     'popcorn',
     'clown'
 );
-
-CREATE TYPE poll_choice AS ENUM ('a', 'b');
 
 CREATE TYPE post_style AS ENUM (
     'standard',
@@ -261,11 +258,6 @@ CREATE TABLE confessions (
     pinned_until TIMESTAMPTZ,
     weekly_rank SMALLINT CHECK (weekly_rank IN (1, 2, 3)),
     
-    -- Sondaggio Opzionale Integrato
-    poll_option_a VARCHAR(80),
-    poll_option_b VARCHAR(80),
-    poll_votes_a INTEGER NOT NULL DEFAULT 0 CHECK (poll_votes_a >= 0),
-    poll_votes_b INTEGER NOT NULL DEFAULT 0 CHECK (poll_votes_b >= 0),
     
     -- Contatori Reazioni & Segnalazioni
     count_skull INTEGER NOT NULL DEFAULT 0 CHECK (count_skull >= 0),
@@ -281,13 +273,7 @@ CREATE TABLE confessions (
     reports_count INTEGER NOT NULL DEFAULT 0 CHECK (reports_count >= 0),
     
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    deleted_at TIMESTAMPTZ,
-
-    -- Vincolo: le opzioni del sondaggio devono essere entrambe presenti o entrambe assenti
-    CONSTRAINT chk_poll_options CHECK (
-        (poll_option_a IS NULL AND poll_option_b IS NULL) OR
-        (poll_option_a IS NOT NULL AND poll_option_b IS NOT NULL)
-    )
+    deleted_at TIMESTAMPTZ
 );
 
 -- Indici Parziali per massime performance su Feed e Classifica (ignorano post cancellati o non approvati)
@@ -308,14 +294,6 @@ CREATE TABLE reactions (
     confession_id UUID NOT NULL REFERENCES confessions(id) ON DELETE CASCADE,
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     type reaction_type NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    PRIMARY KEY (confession_id, user_id)
-);
-
-CREATE TABLE poll_votes (
-    confession_id UUID NOT NULL REFERENCES confessions(id) ON DELETE CASCADE,
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    choice poll_choice NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (confession_id, user_id)
 );
@@ -458,7 +436,7 @@ hot-mic/
 │   └── index.py            # Entrypoint ASGI per Vercel Serverless Function
 ├── src/
 │   ├── agents/             # Pipeline LangGraph (Triage, Roast IA, Avvocato/Accusa con DeepSeek)
-│   ├── model/              # Modelli SQLModel / PostgreSQL (User, Confession, Reaction, Poll, CoinTx)
+│   ├── model/              # Modelli SQLModel / PostgreSQL (User, Confession, Reaction, CoinTx)
 │   ├── router/             # Router FastAPI (Web SSR Jinja2, HTMX endpoints, Webhook Telegram)
 │   ├── schema/             # Schemi Pydantic e configurazione Settings (settings.py)
 │   ├── services/           # Logica di business (HMAC user_key, rate-limit Redis, Stars)

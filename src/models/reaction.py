@@ -16,6 +16,7 @@ class Reaction(SQLModel, table=True):
     __tablename__ = "reactions"
     __table_args__ = (
         sa.UniqueConstraint("confession_id", "user_id", name="uq_reactions_confession_user"),
+        sa.Index("idx_reactions_user_confession", "user_id", "confession_id"),
     )
 
     id: Optional[int] = Field(

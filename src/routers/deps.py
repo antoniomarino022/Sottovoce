@@ -10,9 +10,9 @@ from src.services.auth_service import TelegramAuthService
 
 def extract_raw_init_data(
     authorization: Optional[str] = Header(None, description="Format: 'tma <raw_init_data>'"),
-    x_telegram_init_data: Optional[str] = Header(None, description="Alternative: raw initData header"),
+    x_telegram_init_data: Optional[str] = Header(None, description="Telegram WebApp initData header"),
 ) -> Optional[str]:
-    """Extract raw Telegram initData string from HTTP headers if present."""
+    """Extract raw Telegram Mini App initData string from HTTP headers if present."""
     if x_telegram_init_data:
         return x_telegram_init_data.strip()
 
@@ -24,11 +24,17 @@ def extract_raw_init_data(
 
 async def get_current_user(
     raw_init_data: Optional[str] = Depends(extract_raw_init_data),
-    hotmic_session: Optional[str] = Cookie(None, description="Session cookie for web users"),
+    hotmic_session: Optional[str] = Cookie(None, description="Mini App SSR session cookie"),
     session: Session = Depends(get_session),
 ) -> User:
-    """FastAPI dependency to authenticate and resolve the current User from Cookie or Telegram initData."""
-    # Authenticate via web session cookie
+    """Resolve the current Telegram Mini App user from signed initData (or SSR session cookie)."""
+    if raw_init_data:
+        user, _ = TelegramAuthService.get_or_create_user(
+            session=session,
+            init_data_str=raw_init_data,
+        )
+        return user
+
     if hotmic_session:
         user = session.exec(select(User).where(User.user_key == hotmic_session)).first()
         if user:
@@ -39,17 +45,9 @@ async def get_current_user(
                 )
             return user
 
-    # Authenticate via Telegram Mini App initData
-    if raw_init_data:
-        user, _ = TelegramAuthService.get_or_create_user(
-            session=session,
-            init_data_str=raw_init_data,
-        )
-        return user
-
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Unauthorized. Sign in via Telegram (Web cookie or Mini App initData).",
+        detail="Accesso non autorizzato. Apri Hot-Mic da Telegram.",
     )
 
 
@@ -58,7 +56,7 @@ async def get_optional_current_user(
     hotmic_session: Optional[str] = Cookie(None),
     session: Session = Depends(get_session),
 ) -> Optional[User]:
-    """Optional FastAPI dependency for public endpoints that can optionally personalize content."""
+    """Optional dependency for Mini App pages and public endpoints."""
     try:
         return await get_current_user(
             raw_init_data=raw_init_data,

@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 {% import "macros/ui.html" as ui %}
 
-{% block title %}Hot-Mic — Accesso{% endblock %}
+{% block title %}Hot-Mic — Benvenuto{% endblock %}
 
 {% block content %}
 <div class="flex-1 flex flex-col justify-center max-w-md w-full mx-auto px-4 py-8">
-  <!-- Minimal Header -->
+  <!-- Native Mini App Header -->
   <div class="text-center mb-6">
     <div class="size-12 mx-auto mb-3 rounded-full bg-accent text-on-accent flex items-center justify-center">
       {{ ui.icon("mic", cls="size-6") }}
@@ -16,172 +16,46 @@
 
   <div id="authError" class="text-danger text-sm text-center mb-4 hidden" role="alert"></div>
 
-  {% if user %}
-  <!-- Authenticated State -->
-  <div class="bg-section rounded-2xl overflow-hidden divide-y divide-sep">
-    <div class="flex items-center gap-3 px-4 py-3">
-      {{ ui.avatar(user.telegram_username or "U", cls="size-10") }}
-      <div class="min-w-0 flex-1">
-        <p class="text-[16px] font-medium text-text truncate">
-          {{ user.telegram_username or "Utente Anonimo" }}
-        </p>
-        <p class="text-xs text-hint">Sei connesso</p>
-      </div>
-    </div>
-    
-    <div class="p-4 space-y-3">
-      <a href="/confession" data-haptic class="w-full h-11 flex items-center justify-center rounded-xl bg-accent text-on-accent font-medium text-[15px] active:opacity-90">
-        Vai alle Confessioni
-      </a>
-      <button type="button" onclick="handleLogout()" data-haptic class="w-full h-11 flex items-center justify-center rounded-xl text-danger text-[15px] active:bg-press">
-        Disconnetti
-      </button>
-    </div>
-  </div>
-
-  {% else %}
-  <!-- Login Section -->
-  <div class="bg-section rounded-2xl p-4 space-y-4">
-    <!-- Terms Checkbox -->
+  <!-- Telegram Mini App Onboarding Gate -->
+  <div id="miniAppSection" class="bg-section rounded-2xl p-4 space-y-4">
     <label class="flex items-start gap-3 select-none cursor-pointer">
-      <input 
-        type="checkbox" 
-        id="termsAccepted" 
+      <input
+        type="checkbox"
+        id="termsAccepted"
         class="mt-0.5 size-5 rounded"
-        style="accent-color: var(--c-accent);" 
+        style="accent-color: var(--c-accent);"
         checked
       />
       <span class="text-xs text-hint leading-snug">
-        Accetto i termini di servizio e la privacy policy di Hot-Mic.
+        Accetto i termini di servizio e la privacy policy di Hot-Mic. La tua identità Telegram viene convertita in una chiave anonima irreversibile.
       </span>
     </label>
 
-    <!-- TMA Native Login Button -->
-    <div id="miniAppSection" class="hidden">
-      <button 
-        type="button" 
-        id="tmaLoginBtn"
-        onclick="handleTmaLogin()" 
-        data-haptic 
-        class="w-full h-11 flex items-center justify-center gap-2 rounded-xl bg-accent text-on-accent font-medium text-[15px] active:opacity-90"
-      >
-        {{ ui.icon("send", cls="size-4") }}
-        <span>Accedi con Telegram</span>
-      </button>
-    </div>
-
-    <!-- Web Widget Fallback -->
-    <div id="webWidgetSection" class="text-center pt-1">
-      <div class="flex justify-center min-h-[44px]">
-        <script 
-          async 
-          src="https://telegram.org/js/telegram-widget.js?22" 
-          data-telegram-login="{{ bot_username }}" 
-          data-size="large" 
-          data-radius="10" 
-          data-onauth="onTelegramAuth(user)" 
-          data-request-access="write">
-        </script>
-      </div>
-    </div>
+    <button
+      type="button"
+      id="tmaLoginBtn"
+      onclick="handleTmaLogin()"
+      data-haptic
+      class="w-full h-11 flex items-center justify-center gap-2 rounded-xl bg-accent text-on-accent font-medium text-[15px] active:opacity-90 disabled:opacity-60"
+    >
+      {{ ui.icon("lock", cls="size-4") }}
+      <span>Entra in anonimato</span>
+    </button>
   </div>
-  {% endif %}
+
+  <!-- Shown only if opened outside Telegram WebApp -->
+  <div id="openInTelegramSection" class="hidden bg-section rounded-2xl p-4 space-y-4 text-center">
+    <p class="text-sm text-hint leading-snug">
+      Hot-Mic è una Mini App esclusiva di Telegram. Aprila dal bot ufficiale per continuare in totale anonimato.
+    </p>
+    <a
+      href="https://t.me/{{ bot_username or 'HotMicBot' }}"
+      hx-boost="false"
+      class="w-full h-11 flex items-center justify-center gap-2 rounded-xl bg-accent text-on-accent font-medium text-[15px] active:opacity-90"
+    >
+      {{ ui.icon("send", cls="size-4") }}
+      <span>Apri @{{ bot_username or 'HotMicBot' }}</span>
+    </a>
+  </div>
 </div>
-{% endblock %}
-
-{% block scripts %}
-<script>
-  const tgApp = window.Telegram?.WebApp;
-
-  document.addEventListener('DOMContentLoaded', () => {
-    if (tgApp && tgApp.initData && tgApp.initData.length > 0) {
-      document.getElementById('miniAppSection')?.classList.remove('hidden');
-      document.getElementById('webWidgetSection')?.classList.add('hidden');
-    }
-  });
-
-  function showError(msg) {
-    const el = document.getElementById('authError');
-    if (!el) return;
-    if (msg) {
-      el.textContent = msg;
-      el.classList.remove('hidden');
-    } else {
-      el.classList.add('hidden');
-    }
-  }
-
-  async function handleTmaLogin() {
-    showError(null);
-    if (!tgApp || !tgApp.initData) {
-      showError('Nessun dato Telegram WebApp rilevato.');
-      return;
-    }
-
-    const accepted = document.getElementById('termsAccepted')?.checked;
-    if (!accepted) {
-      showError('Devi accettare i termini per continuare.');
-      return;
-    }
-
-    const btn = document.getElementById('tmaLoginBtn');
-    if (btn) btn.disabled = true;
-
-    try {
-      const res = await fetch('/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          data: { init_data: tgApp.initData },
-          checkbox: { accepted: true }
-        })
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'Errore durante la registrazione.');
-
-      window.location.href = '/confession';
-    } catch (err) {
-      showError(err.message);
-    } finally {
-      if (btn) btn.disabled = false;
-    }
-  }
-
-  async function onTelegramAuth(user) {
-    showError(null);
-    const accepted = document.getElementById('termsAccepted')?.checked;
-    if (!accepted) {
-      showError('Devi accettare i termini per continuare.');
-      return;
-    }
-
-    try {
-      const res = await fetch('/auth/widget', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...user,
-          accepted: true
-        })
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'Errore di autenticazione.');
-
-      window.location.href = '/confession';
-    } catch (err) {
-      showError(err.message);
-    }
-  }
-
-  async function handleLogout() {
-    try {
-      await fetch('/auth/logout', { method: 'POST' });
-      window.location.reload();
-    } catch (err) {
-      showError('Errore durante la disconnessione.');
-    }
-  }
-</script>
 {% endblock %}

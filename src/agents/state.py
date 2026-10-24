@@ -26,12 +26,19 @@ class TriageResult(BaseModel):
     reason: str = Field(
         description="Concise justification detailing the reasoning behind the triage classification",
     )
+    ai_roast: Optional[str] = Field(
+        default=None,
+        description=(
+            "The 3-act satirical roast verdict from the Giudice Supremo if roast_allowed is True and severity < 8. "
+            "Leave None if roast_allowed is False or severity >= 8."
+        ),
+    )
 
 
 class ConfessionState(TypedDict, total=False):
     """Complete conversational and processing state of a confession throughout the graph."""
 
-    confession_id: int | str
+    confession_id: Optional[int | str]
     content: str
     mod_status: ModerationStateStatus
     severity: int

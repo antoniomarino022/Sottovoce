@@ -58,3 +58,21 @@ button, a { touch-action: manipulation; }
 .htmx-request {
   opacity: 0.6;
 }
+.htmx-swapping {
+  opacity: 0.85;
+  transition: opacity 60ms ease-out;
+}
+.htmx-settling {
+  opacity: 1;
+  transition: opacity 80ms ease-in;
+}
+.htmx-indicator {
+  display: none;
+}
+.htmx-request .htmx-indicator,
+.htmx-request.htmx-indicator {
+  display: inline-block;
+}
+.htmx-request .htmx-hide-on-request {
+  display: none;
+}

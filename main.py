@@ -1,42 +1,80 @@
-import anyio
+import sys
+
+# On Windows, psycopg async requires SelectorEventLoop instead of ProactorEventLoop
+if sys.platform == "win32":
+    import asyncio
+    try:
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+    except Exception:
+        pass
+
 import asyncio
 from contextlib import asynccontextmanager
 import logging
-from typing import Optional
 
-from fastapi import Depends, FastAPI, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+import anyio
+from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
+from starlette.middleware.gzip import GZipMiddleware
 
 from config.database import init_db
 from config.settings import settings
-from src.models import User
 from src.routers import (
+    ad_router,
     auth_router,
     confession_router,
-    get_optional_current_user,
+    leaderboard_router,
+    pages_router,
+    reaction_router,
+    report_router,
+    telegram_router,
 )
 
 logger = logging.getLogger("hotmic")
 logging.basicConfig(level=logging.INFO)
 
 
+class CachedStaticFiles(StaticFiles):
+    """StaticFiles with Cache-Control headers for browser and Telegram WebView caching."""
+
+    async def get_response(self, path: str, scope):
+        response = await super().get_response(path, scope)
+        if response.status_code == 200:
+            response.headers["Cache-Control"] = "public, max-age=86400"
+        return response
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Manage application lifespan: initializes database tables on startup without blocking server boot."""
-    async def run_db_init():
-        try:
-            await anyio.to_thread.run_sync(init_db)
-            logger.info("Database tables initialized successfully.")
-        except Exception as exc:
-            logger.warning(
-                "Could not initialize database on startup (expected if local/Neon DB is offline): %s",
-                exc,
-            )
+    """Initialize local dev resources on startup and cleanly close pools on shutdown.
 
-    asyncio.create_task(run_db_init())
+    On Vercel Serverless, schema creation is handled by Alembic migrations (`alembic upgrade head`)
+    to avoid slowing down cold starts with DDL queries.
+    """
+    if not settings.is_serverless:
+        async def _run_local_db_init():
+            try:
+                await anyio.to_thread.run_sync(init_db)
+                logger.info("Database tables verified.")
+            except Exception as exc:
+                logger.warning("Local/Neon DB not reachable on startup: %s", exc)
+
+        asyncio.create_task(_run_local_db_init())
+
+    try:
+        from src.agents.memory import init_checkpointer
+        await init_checkpointer()
+        logger.info("LangGraph PostgreSQL checkpointer pool ready.")
+    except Exception as exc:
+        logger.warning("Checkpointer using in-memory fallback: %s", exc)
+
     yield
+
+    try:
+        from src.agents.memory import close_checkpointer
+        await close_checkpointer()
+    except Exception:
+        pass
 
 
 app = FastAPI(
@@ -46,67 +84,21 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Static files (Tailwind CSS, assets, etc.)
-app.mount("/static", StaticFiles(directory="src/static"), name="static")
+# Gzip compression for HTML, CSS, JS, and JSON responses > 500 bytes
+app.add_middleware(GZipMiddleware, minimum_size=500)
 
-# Jinja2 template engine configuration
-templates = Jinja2Templates(directory="src/templates")
+# Static assets with 1-day Cache-Control
+app.mount("/static", CachedStaticFiles(directory="src/static"), name="static")
 
-# Include API routers
+# UI Pages (SSR + HTMX partials) & JSON API Routers
+app.include_router(pages_router)
 app.include_router(auth_router)
 app.include_router(confession_router)
-
-
-@app.get("/", response_class=HTMLResponse)
-async def index(
-    request: Request,
-    current_user: Optional[User] = Depends(get_optional_current_user),
-):
-    """Home page: redirect to registration if not authenticated, otherwise show confession page."""
-    if not current_user:
-        return RedirectResponse(url="/register", status_code=302)
-    return templates.TemplateResponse(
-        request=request,
-        name="confession.html",
-        context={
-            "bot_username": settings.TELEGRAM_BOT_USERNAME,
-            "user": current_user,
-        },
-    )
-
-
-@app.get("/confession", response_class=HTMLResponse)
-async def confession_page(
-    request: Request,
-    current_user: Optional[User] = Depends(get_optional_current_user),
-):
-    """Confession creation page."""
-    if not current_user:
-        return RedirectResponse(url="/register", status_code=302)
-    return templates.TemplateResponse(
-        request=request,
-        name="confession.html",
-        context={
-            "bot_username": settings.TELEGRAM_BOT_USERNAME,
-            "user": current_user,
-        },
-    )
-
-
-@app.get("/register", response_class=HTMLResponse)
-async def register_page(
-    request: Request,
-    current_user: Optional[User] = Depends(get_optional_current_user),
-):
-    """Registration and Telegram authentication page."""
-    return templates.TemplateResponse(
-        request=request,
-        name="register.html",
-        context={
-            "bot_username": settings.TELEGRAM_BOT_USERNAME,
-            "user": current_user,
-        },
-    )
+app.include_router(reaction_router)
+app.include_router(report_router)
+app.include_router(telegram_router)
+app.include_router(leaderboard_router)
+app.include_router(ad_router)
 
 
 @app.get("/health", tags=["Health"])

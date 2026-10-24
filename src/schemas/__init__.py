@@ -11,15 +11,12 @@ from src.schemas.confession import (
     ConfessionFilterRequest,
     ConfessionResponse,
 )
-from src.schemas.poll_vote import (
-    PollVoteCreate,
-    PollVoteCreateRequest,
-    PollVoteResponse,
-)
 from src.schemas.reaction import (
+    ConfessionReactionsSummary,
     ReactionCreate,
     ReactionCreateRequest,
     ReactionResponse,
+    ReactionToggleResponse,
 )
 from src.schemas.report import (
     ReportCreate,
@@ -29,7 +26,6 @@ from src.schemas.report import (
 )
 from src.schemas.user import (
     TelegramAuthRequest,
-    TelegramWidgetAuthRequest,
     UserCreate,
     UserResponse,
     UserStatusUpdateRequest,
@@ -39,7 +35,6 @@ from src.schemas.user import (
 __all__ = [
     # User
     "TelegramAuthRequest",
-    "TelegramWidgetAuthRequest",
     "UserTermsAcceptRequest",
     "UserCreate",
     "UserStatusUpdateRequest",
@@ -54,10 +49,8 @@ __all__ = [
     "ReactionCreateRequest",
     "ReactionCreate",
     "ReactionResponse",
-    # Poll Vote
-    "PollVoteCreateRequest",
-    "PollVoteCreate",
-    "PollVoteResponse",
+    "ReactionToggleResponse",
+    "ConfessionReactionsSummary",
     # Report
     "ReportCreateRequest",
     "ReportCreate",

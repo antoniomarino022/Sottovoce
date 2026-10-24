@@ -1,23 +1,26 @@
 from collections.abc import Generator
-from sqlmodel import Session, SQLModel, create_engine
 from sqlalchemy.pool import NullPool
+from sqlmodel import Session, SQLModel, create_engine
 
 from config.settings import settings
 
-# Retrieve the raw connection string from the SecretStr
 database_url = settings.DATABASE_URL.get_secret_value()
+is_postgres = database_url.startswith("postgresql")
 
-# Add connection timeout for PostgreSQL to prevent startup hanging when DB is offline
-connect_args = {"connect_timeout": 3} if database_url.startswith("postgresql") else {}
+connect_args = {"connect_timeout": 3} if is_postgres else {}
 
-# For serverless deployment (Vercel) + Neon connection pooler:
-# NullPool disables client-side connection pooling, allowing Neon's PgBouncer
-# to manage incoming connections effectively without leaking resources.
+if is_postgres and settings.is_serverless:
+    pool_kwargs = {"poolclass": NullPool}
+elif is_postgres:
+    pool_kwargs = {"pool_size": 5, "max_overflow": 10, "pool_recycle": 240}
+else:
+    pool_kwargs = {}
+
 engine = create_engine(
     database_url,
     echo=False,
-    poolclass=NullPool,
     connect_args=connect_args,
+    **pool_kwargs,
 )
 
 
@@ -30,5 +33,5 @@ def init_db() -> None:
 
 def get_session() -> Generator[Session, None, None]:
     """FastAPI dependency that yields a database session per request."""
-    with Session(engine) as session:
+    with Session(engine, expire_on_commit=False) as session:
         yield session

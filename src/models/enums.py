@@ -35,11 +35,6 @@ class ReactionType(str, enum.Enum):
     CLOWN = "clown"
 
 
-class PollChoice(str, enum.Enum):
-    A = "a"
-    B = "b"
-
-
 class PostStyle(str, enum.Enum):
     STANDARD = "standard"
     NEON_CYBER = "neon_cyber"
@@ -62,6 +57,7 @@ class TxType(str, enum.Enum):
     BUY_AI_LAWYER = "buy_ai_lawyer"
     BUY_AI_PROSECUTOR = "buy_ai_prosecutor"
     BUY_SHAME_STAMP = "buy_shame_stamp"
+    AD_REWARD = "ad_reward"
 
 
 def pg_enum(enum_cls: type[enum.Enum], name: str) -> sa.Enum:

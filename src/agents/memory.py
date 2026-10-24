@@ -1,151 +1,90 @@
-"""Checkpointer management for LangGraph workflows (Postgres -> SQLite -> in-memory)."""
-
-import logging
-import os
-from contextlib import AsyncExitStack, asynccontextmanager
-from pathlib import Path
-from typing import Any, AsyncGenerator, Optional, cast
+from contextlib import asynccontextmanager
+from typing import Any, AsyncGenerator, Optional
 
 from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.memory import MemorySaver
-from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+from psycopg.rows import dict_row
+from psycopg_pool import AsyncConnectionPool
 
 from config.settings import settings
 
-logger = logging.getLogger("hotmic.agents.memory")
-
-CHECKPOINT_BACKEND_ENV = "HOTMIC_CHECKPOINT_BACKEND"
-DEFAULT_BACKEND = "sqlite"
-POSTGRES_CONNECT_TIMEOUT_SECONDS = 3
-SQLITE_DIR = Path("data")
-SQLITE_FILENAME = "checkpoints.sqlite3"
-
-_active_memory_checkpointer: BaseCheckpointSaver = MemorySaver()
+_pool: Optional[AsyncConnectionPool] = None
+_saver: Optional[Any] = None
 
 
-# ---------------------------------------------------------------------------
-# In-memory checkpointer
-# ---------------------------------------------------------------------------
+async def init_checkpointer() -> AsyncPostgresSaver:
+    """Open the pool and create tables once. Call at app startup."""
+    global _pool, _saver
+    if _saver is not None:
+        return _saver
+
+    _pool = AsyncConnectionPool(
+        conninfo=settings.DATABASE_URL.get_secret_value(),
+        min_size=0 if settings.is_serverless else 1,
+        max_size=2 if settings.is_serverless else 5,
+        kwargs={"autocommit": True, "prepare_threshold": 0, "row_factory": dict_row},
+        open=False,
+    )
+    await _pool.open(wait=True, timeout=5)
+    _saver = AsyncPostgresSaver(_pool)  # type: ignore[arg-type]
+    if not settings.is_serverless:
+        await _saver.setup()
+    return _saver
 
 
-def get_checkpointer() -> BaseCheckpointSaver:
-    """Return the in-memory checkpointer used for compiled StateGraph workflows."""
-    return _active_memory_checkpointer
+async def close_checkpointer() -> None:
+    """Close the pool. Call at app shutdown."""
+    global _pool, _saver
+    if _pool is not None:
+        await _pool.close()
+    _pool = _saver = None
 
 
-def reset_checkpointer_for_testing(
-    custom_saver: Optional[BaseCheckpointSaver] = None,
-) -> None:
-    """Reset the in-memory checkpointer for clean, isolated test runs."""
-    global _active_memory_checkpointer
-    _active_memory_checkpointer = custom_saver or MemorySaver()
+def reset_checkpointer_for_testing(custom_saver: Optional[Any] = None) -> None:
+    """Reset the checkpointer for tests and clear compiled graph cache."""
+    global _saver
+    _saver = custom_saver or MemorySaver()
+    try:
+        from src.agents.graph import reset_compiled_graphs
+        reset_compiled_graphs()
+    except Exception:
+        pass
 
 
-# ---------------------------------------------------------------------------
-# Persistent backends
-# ---------------------------------------------------------------------------
-
-
-async def _open_postgres(stack: AsyncExitStack) -> BaseCheckpointSaver:
-    """Open and set up a PostgreSQL saver; its lifetime is bound to `stack`."""
-    from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
-
-    raw_url = settings.DATABASE_URL.get_secret_value()
-    separator = "&" if "?" in raw_url else "?"
-    conn_string = f"{raw_url}{separator}connect_timeout={POSTGRES_CONNECT_TIMEOUT_SECONDS}"
-
-    saver = await stack.enter_async_context(AsyncPostgresSaver.from_conn_string(conn_string))
-    await saver.setup()
-    logger.info("Engaged production PostgreSQL async checkpointer.")
-    return saver
-
-
-async def _open_sqlite(stack: AsyncExitStack) -> BaseCheckpointSaver:
-    """Open and set up a SQLite saver; its lifetime is bound to `stack`."""
-    SQLITE_DIR.mkdir(parents=True, exist_ok=True)
-    db_path = SQLITE_DIR / SQLITE_FILENAME
-
-    saver = await stack.enter_async_context(AsyncSqliteSaver.from_conn_string(str(db_path)))
-    await saver.setup()
-    logger.info("Engaged persistent SQLite async checkpointer at %s", db_path)
-    return saver
-
-
-async def _open_persistent_saver(
-    stack: AsyncExitStack,
-    backend: str,
-) -> Optional[BaseCheckpointSaver]:
-    """Try Postgres, then SQLite, depending on `backend`. Return None if all fail."""
-    if settings.DATABASE_URL.get_secret_value():
-        try:
-            return await _open_postgres(stack)
-        except Exception as exc:
-            logger.warning(
-                "PostgreSQL async checkpointer failed: %s. Falling back to persistent SQLite.",
-                exc,
-            )
-
-    if backend in {"auto", "sqlite", "postgres"}:
-        try:
-            return await _open_sqlite(stack)
-        except Exception as exc:
-            logger.warning(
-                "SQLite async checkpointer failed: %s. Falling back to in-memory checkpointer.",
-                exc,
-            )
-
-    return None
+def get_checkpointer() -> Any:
+    global _saver
+    if _saver is None:
+        _saver = MemorySaver()
+    return _saver
 
 
 @asynccontextmanager
-async def get_async_checkpointer() -> AsyncGenerator[BaseCheckpointSaver, None]:
-    """Yield a persistent async checkpointer, falling back to in-memory if needed."""
-    async with AsyncExitStack() as stack:
-        saver = await _open_persistent_saver(stack, DEFAULT_BACKEND)
-        # `yield` stays outside any try/except so errors raised by the caller's
-        # block are never mistaken for backend failures.
-        yield saver or _active_memory_checkpointer
+async def get_async_checkpointer() -> AsyncGenerator[Any, None]:
+    """Compatibility wrapper: yields the shared saver, opens nothing."""
+    yield get_checkpointer()
 
 
-# ---------------------------------------------------------------------------
-# Thread config & history
-# ---------------------------------------------------------------------------
-
-
-def get_thread_config(confession_id: int | str) -> RunnableConfig:
-    """Build the LangGraph thread configuration for a confession."""
-    return {"configurable": {"thread_id": f"confession_{confession_id}"}}
-
-
-async def _read_channel_values(
-    saver: BaseCheckpointSaver,
-    config: RunnableConfig | dict[str, Any],
-) -> Optional[dict[str, Any]]:
-    checkpoint_tuple = await saver.aget_tuple(cast(RunnableConfig, config))
-    if checkpoint_tuple and checkpoint_tuple.checkpoint:
-        return checkpoint_tuple.checkpoint.get("channel_values")
-    return None
+def get_thread_config(confession_id: Optional[int | str] = None) -> RunnableConfig:
+    thread_id = f"confession_{confession_id}" if confession_id is not None else "confession_default"
+    return {"configurable": {"thread_id": thread_id}}
 
 
 async def get_confession_history(
-    confession_id: int | str,
-    checkpointer: Optional[BaseCheckpointSaver] = None,
+    confession_id: Optional[int | str] = None,
 ) -> Optional[dict[str, Any]]:
-    """Return persisted state values for a confession, or None if none exist."""
-    config = get_thread_config(confession_id)
-
-    if checkpointer is not None:
-        return await _read_channel_values(checkpointer, config)
-
-    async with get_async_checkpointer() as saver:
-        return await _read_channel_values(saver, config)
+    """Return persisted state values for a confession, or None."""
+    tup = await get_checkpointer().aget_tuple(get_thread_config(confession_id))
+    return tup.checkpoint.get("channel_values") if tup and tup.checkpoint else None
 
 
 __all__ = [
+    "init_checkpointer",
+    "close_checkpointer",
+    "reset_checkpointer_for_testing",
     "get_checkpointer",
     "get_async_checkpointer",
     "get_thread_config",
     "get_confession_history",
-    "reset_checkpointer_for_testing",
 ]

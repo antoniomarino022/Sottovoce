@@ -1,18 +1,29 @@
 """Comprehensive unit tests for Hot-Mic agents, guardrails, prompts, and memory."""
 
+from datetime import datetime, timezone
 from unittest import IsolatedAsyncioTestCase, main
 from unittest.mock import AsyncMock, patch
 from langchain_core.messages import AIMessage
 from langgraph.graph import END
+from sqlmodel import Session, SQLModel, create_engine
+
+from src.models import Confession, User
+from src.models.enums import ModerationStatus
+from src.schemas import ConfessionCreate
+from src.services.confession_service import (
+    create_confession_service,
+    invoke_defense_service,
+    invoke_prosecution_service,
+)
 
 from src.agents import (
     ConfessionState,
     get_checkpointer,
     run_confession_pipeline,
+    run_defense_agent,
+    run_prosecution_agent,
 )
 from src.agents.graph import (
-    route_after_defense,
-    route_after_judge,
     route_after_triage,
 )
 from src.agents.guardrails import (
@@ -200,19 +211,8 @@ class TestAgentsPipeline(IsolatedAsyncioTestCase):
         self.assertEqual(route_after_triage({"mod_status": "crisis_held"}), END)
         self.assertEqual(route_after_triage({"mod_status": "rejected"}), END)
 
-        self.assertEqual(route_after_judge({"active_powers": ["ai_lawyer"]}), "defense")
-        self.assertEqual(route_after_judge({"active_powers": ["ai_prosecutor"]}), "prosecution")
-        self.assertEqual(
-            route_after_judge({"active_powers": ["ai_lawyer", "ai_prosecutor"]}),
-            "defense",
-        )
-        self.assertEqual(route_after_judge({"active_powers": []}), END)
-
-        self.assertEqual(route_after_defense({"active_powers": ["ai_prosecutor"]}), "prosecution")
-        self.assertEqual(route_after_defense({"active_powers": []}), END)
-
     async def test_full_pipeline_execution_and_memory(self) -> None:
-        """Test full execution of run_confession_pipeline helper with persistence."""
+        """Test execution of run_confession_pipeline helper with persistence (only Triage + Judge)."""
         triage_mock_result = TriageResult(
             severity=2,
             roast_allowed=True,
@@ -228,35 +228,159 @@ class TestAgentsPipeline(IsolatedAsyncioTestCase):
             mock_triage_llm.with_structured_output.return_value = mock_runnable
 
             mock_creative_llm.ainvoke = AsyncMock(
-                side_effect=[
-                    AIMessage(content="Giudizio: colpevole di pigrizia."),
-                    AIMessage(content="Difesa: il mio cliente riposava la mente."),
-                    AIMessage(content="Accusa: la pigrizia distruggerà il mondo."),
-                ]
+                return_value=AIMessage(content="Giudizio: colpevole di pigrizia.")
             )
 
             result = await run_confession_pipeline(
                 content="Non ho rifatto il letto per tre settimane.",
                 confession_id=42,
-                active_powers=["ai_lawyer", "ai_prosecutor"],
             )
 
             self.assertEqual(result["mod_status"], "approved")
             self.assertTrue(result["roast_allowed"])
             self.assertEqual(result["ai_roast"], "Giudizio: colpevole di pigrizia.")
-            self.assertEqual(
-                result["ai_defense"],
-                "Difesa: il mio cliente riposava la mente.",
-            )
-            self.assertEqual(
-                result["ai_prosecution"],
-                "Accusa: la pigrizia distruggerà il mondo.",
-            )
+            # Verify defense and prosecution are not executed in the initial pipeline
+            self.assertIsNone(result.get("ai_defense"))
+            self.assertIsNone(result.get("ai_prosecution"))
 
             # Retrieve persisted state through memory checkpoint helper
             saved_history = await get_confession_history(42)
             self.assertIsNotNone(saved_history)
             self.assertEqual(saved_history.get("ai_roast"), "Giudizio: colpevole di pigrizia.")
+
+    async def test_single_pass_triage_and_judge(self) -> None:
+        """Verify single-pass triage delivers both classification and roast in one call without calling creative_llm."""
+        single_pass_mock = TriageResult(
+            severity=1,
+            roast_allowed=True,
+            reason="Comedic and approved.",
+            ai_roast="La Corte ti condanna alla pubblica derisione per la tua pigrizia!",
+        )
+
+        with (
+            patch("src.agents.nodes.triage_llm") as mock_triage_llm,
+            patch("src.agents.nodes.creative_llm") as mock_creative_llm,
+        ):
+            mock_runnable = AsyncMock()
+            mock_runnable.ainvoke.return_value = single_pass_mock
+            mock_triage_llm.with_structured_output.return_value = mock_runnable
+
+            result = await run_confession_pipeline(
+                content="Ho finto di stare male per non andare alla cena di compleanno.",
+                confession_id=77,
+            )
+
+            # Assert output
+            self.assertEqual(result["mod_status"], "approved")
+            self.assertTrue(result["roast_allowed"])
+            self.assertIn("pubblica derisione", result["ai_roast"])
+
+            # Verify creative_llm was NEVER invoked because single-pass produced the roast
+            mock_creative_llm.ainvoke.assert_not_called()
+
+    async def test_standalone_defense_and_prosecution_agents(self) -> None:
+        """Test calling defense and prosecution agents individually on an approved confession."""
+        with patch("src.agents.nodes.creative_llm") as mock_creative_llm:
+            mock_creative_llm.ainvoke = AsyncMock(
+                side_effect=[
+                    AIMessage(content="Difesa: il mio cliente riposava la mente."),
+                    AIMessage(content="Accusa: la pigrizia distruggerà il mondo."),
+                ]
+            )
+
+            defense_res = await run_defense_agent(
+                confession_id=42,
+                content="Non ho rifatto il letto per tre settimane.",
+                ai_roast="Giudizio: colpevole di pigrizia.",
+            )
+            self.assertEqual(
+                defense_res.get("ai_defense"),
+                "Difesa: il mio cliente riposava la mente.",
+            )
+
+            prosecution_res = await run_prosecution_agent(
+                confession_id=42,
+                content="Non ho rifatto il letto per tre settimane.",
+                ai_roast="Giudizio: colpevole di pigrizia.",
+                ai_defense=defense_res.get("ai_defense"),
+            )
+            self.assertEqual(
+                prosecution_res.get("ai_prosecution"),
+                "Accusa: la pigrizia distruggerà il mondo.",
+            )
+
+    async def test_create_confession_service_runs_triage_and_judge(self) -> None:
+        """Verify that create_confession_service runs triage and generates judge roast when approved."""
+        engine = create_engine("sqlite:///:memory:")
+        SQLModel.metadata.create_all(engine)
+
+        with Session(engine) as session:
+            test_user = User(
+                user_key="test_user_key_123",
+                referral_code="REF123",
+                terms_accepted_at=datetime.now(timezone.utc),
+                telegram_id=999,
+                telegram_username="tester",
+            )
+            session.add(test_user)
+            session.commit()
+            session.refresh(test_user)
+            assert test_user.id is not None
+
+            triage_mock = TriageResult(
+                severity=1,
+                roast_allowed=True,
+                reason="Benign comical confession.",
+            )
+
+            with (
+                patch("src.agents.nodes.triage_llm") as mock_triage,
+                patch("src.agents.nodes.creative_llm") as mock_creative,
+            ):
+                mock_runnable = AsyncMock()
+                mock_runnable.ainvoke.return_value = triage_mock
+                mock_triage.with_structured_output.return_value = mock_runnable
+
+                mock_creative.ainvoke = AsyncMock(
+                    return_value=AIMessage(content="Sentenza: sei un buffone matricolato!")
+                )
+
+                created = await create_confession_service(
+                    session=session,
+                    author_id=test_user.id,
+                    data=ConfessionCreate(
+                        content="Ho rubato una penna al mio capo.",
+                    ),
+                )
+
+                self.assertIsNotNone(created.id)
+                self.assertEqual(created.mod_status, ModerationStatus.APPROVED)
+                self.assertEqual(created.severity, 1)
+                self.assertIsNotNone(created.ai_roast)
+                self.assertIn("buffone matricolato", created.ai_roast)
+                self.assertIsNone(created.ai_defense)
+                self.assertIsNone(created.ai_prosecution)
+
+                # Now test invoking defense and prosecution services individually
+                mock_creative.ainvoke = AsyncMock(
+                    return_value=AIMessage(content="Difesa: La penna gli è scivolata in tasca!")
+                )
+                with_defense = await invoke_defense_service(
+                    session=session,
+                    confession_id=created.id,
+                )
+                self.assertIsNotNone(with_defense.ai_defense)
+                self.assertIn("scivolata in tasca", with_defense.ai_defense)
+
+                mock_creative.ainvoke = AsyncMock(
+                    return_value=AIMessage(content="Accusa: Il furto di cancelleria è un crimine!")
+                )
+                with_prosecution = await invoke_prosecution_service(
+                    session=session,
+                    confession_id=created.id,
+                )
+                self.assertIsNotNone(with_prosecution.ai_prosecution)
+                self.assertIn("cancelleria", with_prosecution.ai_prosecution)
 
 
 if __name__ == "__main__":

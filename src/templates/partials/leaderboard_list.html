@@ -1,0 +1,75 @@
+{% from "macros/ui.html" import icon %}
+
+<div class="flex flex-col gap-3">
+  {% if not items %}
+    <div class="p-8 text-center bg-section border border-sep rounded-xl text-hint text-sm flex flex-col items-center gap-2">
+      <span class="text-3xl">🏆</span>
+      <p class="font-medium text-text">Nessun segreto in classifica questa settimana</p>
+      <p class="text-xs">Sii il primo a confessare e scalare il podio!</p>
+    </div>
+  {% else %}
+    {% for item in items %}
+      <article class="bg-section border border-sep rounded-xl p-4 flex flex-col gap-2.5 relative transition-all">
+        <!-- Header: Rank badge & Weekly prize -->
+        <div class="flex items-center justify-between text-xs">
+          <div class="flex items-center gap-2">
+            {% if item.rank == 1 %}
+              <span class="flex items-center gap-1 font-bold text-accent-text bg-secondary px-2 py-0.5 rounded-full text-xs">
+                <span>🥇</span> <span>1° Posto</span>
+              </span>
+            {% elif item.rank == 2 %}
+              <span class="flex items-center gap-1 font-bold text-hint bg-secondary px-2 py-0.5 rounded-full text-xs">
+                <span>🥈</span> <span>2° Posto</span>
+              </span>
+            {% elif item.rank == 3 %}
+              <span class="flex items-center gap-1 font-bold text-hint bg-secondary px-2 py-0.5 rounded-full text-xs">
+                <span>🥉</span> <span>3° Posto</span>
+              </span>
+            {% else %}
+              <span class="font-semibold text-hint bg-secondary px-2 py-0.5 rounded-full text-xs">
+                #{{ item.rank }}
+              </span>
+            {% endif %}
+
+            <span class="text-hint">#{{ item.id }}</span>
+          </div>
+
+          <!-- Reward indicator for podium -->
+          {% if item.reward_coins > 0 %}
+            <span class="text-xs font-semibold text-accent-text flex items-center gap-1 bg-secondary px-2 py-0.5 rounded">
+              <span>Premio:</span> <span>+{{ item.reward_coins }} 🪙</span>
+            </span>
+          {% endif %}
+        </div>
+
+        <!-- Secret content -->
+        <p class="text-[15px] text-text leading-relaxed select-text">{{ item.content }}</p>
+
+        <!-- Judge Roast excerpt if present -->
+        {% if item.ai_roast %}
+          <div class="bg-secondary rounded-lg p-2.5 text-xs border-l-2 border-accent flex flex-col gap-0.5">
+            <span class="text-[10px] font-semibold uppercase tracking-wider text-accent-text">⚖️ Sentenza del Giudice</span>
+            <p class="text-text italic select-text">"{{ item.ai_roast }}"</p>
+          </div>
+        {% endif %}
+
+        <!-- Footer Stats: Reactions or Shares -->
+        <div class="flex items-center justify-between pt-2 border-t border-sep text-xs text-hint">
+          {% if active_type == 'shares' %}
+            <div class="flex items-center gap-1.5 font-medium text-text">
+              <span>🚀</span>
+              <span>{{ item.shares_count or 0 }} condivisioni</span>
+            </div>
+            <span>{{ item.total_reactions or 0 }} voti</span>
+          {% else %}
+            <div class="flex items-center gap-1.5 font-medium text-text">
+              <span>🔥</span>
+              <span>{{ item.total_reactions or 0 }} voti totali</span>
+            </div>
+            <span>{{ item.shares_count or 0 }} condivisioni</span>
+          {% endif %}
+        </div>
+      </article>
+    {% endfor %}
+  {% endif %}
+</div>

@@ -14,7 +14,6 @@ from src.models.enums import (
 
 if TYPE_CHECKING:
     from src.models.coin_transaction import CoinTransaction
-    from src.models.poll_vote import PollVote
     from src.models.reaction import Reaction
     from src.models.report import Report
     from src.models.user import User
@@ -24,21 +23,15 @@ class Confession(SQLModel, table=True):
     __tablename__ = "confessions"
     __table_args__ = (
         sa.CheckConstraint(
-            "(poll_option_a IS NULL AND poll_option_b IS NULL) OR "
-            "(poll_option_a IS NOT NULL AND poll_option_b IS NOT NULL)",
-            name="chk_poll_options",
-        ),
-        sa.CheckConstraint(
             "weekly_rank IN (1, 2, 3)",
             name="chk_confessions_weekly_rank",
         ),
-        sa.CheckConstraint("poll_votes_a >= 0", name="chk_confessions_poll_votes_a"),
-        sa.CheckConstraint("poll_votes_b >= 0", name="chk_confessions_poll_votes_b"),
         sa.CheckConstraint("count_skull >= 0", name="chk_confessions_count_skull"),
         sa.CheckConstraint("count_disagio >= 0", name="chk_confessions_count_disagio"),
         sa.CheckConstraint("count_popcorn >= 0", name="chk_confessions_count_popcorn"),
         sa.CheckConstraint("count_clown >= 0", name="chk_confessions_count_clown"),
         sa.CheckConstraint("reports_count >= 0", name="chk_confessions_reports_count"),
+        sa.CheckConstraint("shares_count >= 0", name="chk_confessions_shares_count"),
         sa.Index(
             "idx_public_feed",
             sa.text("pinned_until DESC"),
@@ -47,8 +40,14 @@ class Confession(SQLModel, table=True):
         ),
         sa.Index(
             "idx_leaderboard",
-            sa.text("created_at DESC"),
             sa.text("total_reactions DESC"),
+            sa.text("created_at DESC"),
+            postgresql_where=sa.text("mod_status = 'approved' AND deleted_at IS NULL"),
+        ),
+        sa.Index(
+            "idx_shares_leaderboard",
+            sa.text("shares_count DESC"),
+            sa.text("created_at DESC"),
             postgresql_where=sa.text("mod_status = 'approved' AND deleted_at IS NULL"),
         ),
         sa.Index(
@@ -125,24 +124,6 @@ class Confession(SQLModel, table=True):
         sa_column=Column(sa.SmallInteger, nullable=True),
     )
 
-    # Sondaggio Opzionale Integrato
-    poll_option_a: Optional[str] = Field(
-        default=None,
-        sa_column=Column(sa.String(80), nullable=True),
-    )
-    poll_option_b: Optional[str] = Field(
-        default=None,
-        sa_column=Column(sa.String(80), nullable=True),
-    )
-    poll_votes_a: int = Field(
-        default=0,
-        sa_column=Column(sa.Integer, nullable=False, server_default="0"),
-    )
-    poll_votes_b: int = Field(
-        default=0,
-        sa_column=Column(sa.Integer, nullable=False, server_default="0"),
-    )
-
     # Contatori Reazioni & Segnalazioni
     count_skull: int = Field(
         default=0,
@@ -178,6 +159,10 @@ class Confession(SQLModel, table=True):
         default=0,
         sa_column=Column(sa.Integer, nullable=False, server_default="0"),
     )
+    shares_count: int = Field(
+        default=0,
+        sa_column=Column(sa.Integer, nullable=False, server_default="0"),
+    )
 
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
@@ -197,10 +182,6 @@ class Confession(SQLModel, table=True):
         back_populates="confessions",
     )
     reactions: list["Reaction"] = Relationship(
-        back_populates="confession",
-        sa_relationship_kwargs={"cascade": "all, delete-orphan"},
-    )
-    poll_votes: list["PollVote"] = Relationship(
         back_populates="confession",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"},
     )

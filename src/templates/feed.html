@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% from "macros/ui.html" import icon, bottom_nav %}
+
+{% block title %}Hot-Mic — Feed delle Confessioni{% endblock %}
+
+{% block content %}
+<div class="flex-1 flex flex-col">
+  <!-- Sticky Native Header -->
+  <header class="sticky top-0 z-30 bg-header border-b border-sep px-4 h-12 flex items-center justify-between">
+    <div class="flex items-center gap-2">
+      <span class="text-xl">🔥</span>
+      <h1 class="font-semibold text-text text-[17px] tracking-tight">Hot-Mic</h1>
+    </div>
+    <div class="flex items-center gap-2 text-xs">
+      <button
+        id="ad-reward-btn"
+        type="button"
+        onclick="watchRewardedAd()"
+        class="flex items-center gap-1 font-semibold text-accent-text bg-secondary px-2.5 py-1 rounded-lg active:bg-press transition-colors"
+        title="Guarda un'ad per ricevere 20 monete"
+      >
+        <span>🎬</span>
+        <span>+20 🪙</span>
+      </button>
+      <span id="user-coins-display" class="user-coins-display text-hint font-medium">{{ user.coins_balance if user else 0 }} 🪙</span>
+    </div>
+  </header>
+
+  <!-- Filter Segmented Control -->
+  <div class="px-4 py-2.5 bg-bg border-b border-sep sticky top-12 z-20">
+    <div class="flex items-center bg-secondary p-1 rounded-xl text-xs font-medium">
+      <a
+        href="/?filter=popular"
+        hx-get="/?filter=popular"
+        hx-target="#feed-list"
+        hx-swap="innerHTML"
+        hx-push-url="true"
+        class="filter-tab flex-1 py-1.5 text-center rounded-lg transition-all {{ 'bg-bg text-text shadow-sm font-semibold' if filter == 'popular' else 'text-hint active:text-text' }}"
+      >
+        🔥 Popolari
+      </a>
+      <a
+        href="/?filter=latest"
+        hx-get="/?filter=latest"
+        hx-target="#feed-list"
+        hx-swap="innerHTML"
+        hx-push-url="true"
+        class="filter-tab flex-1 py-1.5 text-center rounded-lg transition-all {{ 'bg-bg text-text shadow-sm font-semibold' if filter == 'latest' or not filter else 'text-hint active:text-text' }}"
+      >
+        ⏱️ Recenti
+      </a>
+    </div>
+  </div>
+
+  <!-- Feed Container -->
+  <section class="flex-1 px-4 py-3">
+    <div id="feed-list">
+      {% include "partials/feed_list.html" %}
+    </div>
+  </section>
+</div>
+{% endblock %}
+
+{% block nav %}
+{{ bottom_nav(active_tab='my' if filter == 'my' else 'feed') }}
+{% endblock %}

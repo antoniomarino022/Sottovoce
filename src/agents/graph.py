@@ -1,13 +1,11 @@
-from typing import Any
+from functools import lru_cache
+from typing import Any, NamedTuple, Optional
 
 from langchain_core.messages import HumanMessage
 from langgraph.graph import END, START, StateGraph
+from langgraph.graph.state import CompiledStateGraph
 
-from src.agents.memory import (
-    get_async_checkpointer,
-    get_checkpointer,
-    get_thread_config,
-)
+from src.agents.memory import get_checkpointer, get_thread_config
 from src.agents.nodes import (
     defense_node,
     judge_node,
@@ -16,6 +14,9 @@ from src.agents.nodes import (
 )
 from src.agents.state import ConfessionState
 
+# --------------------------------------------------------------------------- #
+# Constants
+# --------------------------------------------------------------------------- #
 # Node names
 TRIAGE = "triage"
 JUDGE = "judge"
@@ -26,71 +27,89 @@ PROSECUTION = "prosecution"
 POWER_LAWYER = "ai_lawyer"
 POWER_PROSECUTOR = "ai_prosecutor"
 
+ConfessionId = int | str | None
 
-# ---------------------------------------------------------------------------
+
+# --------------------------------------------------------------------------- #
 # Routing
-# ---------------------------------------------------------------------------
-
-
-def _has_power(state: ConfessionState, power: str) -> bool:
-    return power in (state.get("active_powers") or [])
-
-
+# --------------------------------------------------------------------------- #
 def route_after_triage(state: ConfessionState) -> str:
     """Go to the judge if the confession is approved, otherwise stop."""
     return JUDGE if state.get("mod_status") == "approved" else END
 
 
-def route_after_judge(state: ConfessionState) -> str:
-    """Go to defense if active, else prosecution if active, else stop."""
-    if _has_power(state, POWER_LAWYER):
-        return DEFENSE
-    if _has_power(state, POWER_PROSECUTOR):
-        return PROSECUTION
-    return END
+# --------------------------------------------------------------------------- #
+# Workflows (uncompiled definitions)
+# --------------------------------------------------------------------------- #
+def _build_pipeline_workflow() -> StateGraph:
+    """Main pipeline: START -> TRIAGE -> (JUDGE if approved) -> END."""
+    graph = StateGraph(ConfessionState)
+    graph.add_node(TRIAGE, triage_node)
+    graph.add_node(JUDGE, judge_node)
+
+    graph.add_edge(START, TRIAGE)
+    graph.add_conditional_edges(TRIAGE, route_after_triage, {JUDGE: JUDGE, END: END})
+    graph.add_edge(JUDGE, END)
+    return graph
 
 
-def route_after_defense(state: ConfessionState) -> str:
-    """Go to prosecution if active, else stop."""
-    return PROSECUTION if _has_power(state, POWER_PROSECUTOR) else END
+def _build_single_node_workflow(name: str, node: Any) -> StateGraph:
+    """Standalone workflow with one node: START -> node -> END."""
+    graph = StateGraph(ConfessionState)
+    graph.add_node(name, node)
+    graph.add_edge(START, name)
+    graph.add_edge(name, END)
+    return graph
 
 
-# ---------------------------------------------------------------------------
-# Graph definition
-# ---------------------------------------------------------------------------
-
-workflow = StateGraph(ConfessionState)
-
-workflow.add_node(TRIAGE, triage_node)
-workflow.add_node(JUDGE, judge_node)
-workflow.add_node(DEFENSE, defense_node)
-workflow.add_node(PROSECUTION, prosecution_node)
-
-workflow.add_edge(START, TRIAGE)
-workflow.add_conditional_edges(TRIAGE, route_after_triage, {JUDGE: JUDGE, END: END})
-workflow.add_conditional_edges(
-    JUDGE, route_after_judge, {DEFENSE: DEFENSE, PROSECUTION: PROSECUTION, END: END}
-)
-workflow.add_conditional_edges(
-    DEFENSE, route_after_defense, {PROSECUTION: PROSECUTION, END: END}
-)
-workflow.add_edge(PROSECUTION, END)
-
-# Default graph backed by the in-memory checkpointer.
-checkpointer = get_checkpointer()
-graph_app = workflow.compile(checkpointer=checkpointer)
+workflow = _build_pipeline_workflow()
+defense_workflow = _build_single_node_workflow(DEFENSE, defense_node)
+prosecution_workflow = _build_single_node_workflow(PROSECUTION, prosecution_node)
 
 
-# ---------------------------------------------------------------------------
-# Pipeline entry point
-# ---------------------------------------------------------------------------
+# --------------------------------------------------------------------------- #
+# Compiled graphs
+# --------------------------------------------------------------------------- #
+class _CompiledGraphs(NamedTuple):
+    pipeline: CompiledStateGraph
+    defense: CompiledStateGraph
+    prosecution: CompiledStateGraph
 
 
+@lru_cache(maxsize=1)
+def _get_graphs() -> _CompiledGraphs:
+    """Compile graphs once. Stateless one-shot personas omit checkpointer DB writes."""
+    saver = get_checkpointer()
+    return _CompiledGraphs(
+        pipeline=workflow.compile(checkpointer=saver),
+        defense=defense_workflow.compile(),
+        prosecution=prosecution_workflow.compile(),
+    )
+
+
+def reset_compiled_graphs() -> None:
+    """Drop cached graphs (call after close_checkpointer() or in tests)."""
+    _get_graphs.cache_clear()
+
+
+async def _run_graph(
+    graph: CompiledStateGraph,
+    state: ConfessionState,
+    confession_id: ConfessionId,
+) -> dict[str, Any]:
+    """Invoke a graph using the thread config tied to the confession."""
+    return await graph.ainvoke(state, config=get_thread_config(confession_id))
+
+
+# --------------------------------------------------------------------------- #
+# State builder
+# --------------------------------------------------------------------------- #
 def _build_initial_state(
     content: str,
-    confession_id: int | str,
-    active_powers: list[str],
+    confession_id: ConfessionId,
+    active_powers: Optional[list[str]] = None,
 ) -> ConfessionState:
+    """Full initial state for a brand-new confession entering the pipeline."""
     return {
         "confession_id": confession_id,
         "content": content,
@@ -101,32 +120,64 @@ def _build_initial_state(
         "ai_roast": None,
         "ai_defense": None,
         "ai_prosecution": None,
-        "active_powers": active_powers,
+        "active_powers": active_powers or [],
         "guardrails_triggered": [],
         "messages": [HumanMessage(content=content)],
     }
 
 
+# --------------------------------------------------------------------------- #
+# Entry points
+# --------------------------------------------------------------------------- #
 async def run_confession_pipeline(
     content: str,
-    confession_id: int | str,
-    active_powers: list[str],
+    confession_id: ConfessionId = None,
+    active_powers: Optional[list[str]] = None,
 ) -> dict[str, Any]:
-    """Run the multi-agent pipeline for one confession, persisting state by thread."""
-    initial_state = _build_initial_state(content, confession_id, active_powers)
-    config = get_thread_config(confession_id)
+    """Triage the confession and, if approved, generate the judge's roast."""
+    state = _build_initial_state(content, confession_id, active_powers)
+    return await _run_graph(_get_graphs().pipeline, state, confession_id)
 
-    async with get_async_checkpointer() as saver:
-        app = workflow.compile(checkpointer=saver)
-        return await app.ainvoke(initial_state, config=config)
+
+async def run_defense_agent(
+    confession_id: ConfessionId = None,
+    content: str = "",
+    ai_roast: Optional[str] = None,
+) -> dict[str, Any]:
+    """Invoke the defense attorney agent on demand (stateless, no checkpoint I/O)."""
+    state: ConfessionState = {
+        "confession_id": confession_id,
+        "content": content,
+        "ai_roast": ai_roast,
+        "active_powers": [POWER_LAWYER],
+    }
+    return await _get_graphs().defense.ainvoke(state)
+
+
+async def run_prosecution_agent(
+    confession_id: ConfessionId = None,
+    content: str = "",
+    ai_roast: Optional[str] = None,
+    ai_defense: Optional[str] = None,
+) -> dict[str, Any]:
+    """Invoke the prosecutor agent on demand (stateless, no checkpoint I/O)."""
+    state: ConfessionState = {
+        "confession_id": confession_id,
+        "content": content,
+        "ai_roast": ai_roast,
+        "ai_defense": ai_defense,
+        "active_powers": [POWER_PROSECUTOR],
+    }
+    return await _get_graphs().prosecution.ainvoke(state)
 
 
 __all__ = [
     "route_after_triage",
-    "route_after_judge",
-    "route_after_defense",
     "workflow",
-    "checkpointer",
-    "graph_app",
+    "defense_workflow",
+    "prosecution_workflow",
+    "reset_compiled_graphs",
     "run_confession_pipeline",
+    "run_defense_agent",
+    "run_prosecution_agent",
 ]

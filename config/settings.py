@@ -1,4 +1,5 @@
 from functools import lru_cache
+import os
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -25,7 +26,7 @@ class Settings(BaseSettings):
     )
 
     REDIS_URL: SecretStr = Field(
-        default=SecretStr("redis://localhost:6379/0"),
+        default=SecretStr("redis://127.0.0.1:6379/0"),
         description="Redis / Upstash connection URL (SecretStr to protect inline credentials)",
     )
     DATABASE_URL: SecretStr = Field(
@@ -36,12 +37,25 @@ class Settings(BaseSettings):
 
     TELEGRAM_BOT_USERNAME: str = Field(
         default="HotMicBot",
-        description="Telegram bot username (without @) for the Web Login Widget",
+        description="Telegram bot username (without @) for Mini App deep links",
     )
     TELEGRAM_WEBHOOK_URL: str = Field(
         default="",
         description="Public URL endpoint for Telegram webhook on Vercel",
     )
+    WEBAPP_URL: str = Field(
+        default="https://hot-mic.vercel.app",
+        description="Public URL for Telegram Mini App",
+    )
+    ADSGRAM_BLOCK_ID: str = Field(
+        default="",
+        description="Adsgram Block ID for rewarded ads (e.g. 1234 or your Adsgram placement ID)",
+    )
+
+    @property
+    def is_serverless(self) -> bool:
+        """True when running inside Vercel or AWS Lambda serverless functions."""
+        return bool(os.getenv("VERCEL") or os.getenv("AWS_LAMBDA_FUNCTION_NAME"))
 
     model_config = SettingsConfigDict(
         env_file=".env",

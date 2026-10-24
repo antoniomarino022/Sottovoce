@@ -1,7 +1,6 @@
 from datetime import datetime, timezone
 import re
 from typing import Optional
-import uuid
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -9,11 +8,12 @@ from src.models.enums import UserStatus
 
 
 class TelegramAuthRequest(BaseModel):
-    """Richiesta di autenticazione da Telegram Mini App o widget."""
+    """Richiesta di autenticazione da Telegram Mini App."""
+
     init_data: str = Field(
         ...,
         min_length=10,
-        description="Stringa grezza 'initData' firmata da Telegram",
+        description="Stringa grezza 'initData' firmata da Telegram WebApp",
     )
     referral_code: Optional[str] = Field(
         default=None,
@@ -33,7 +33,8 @@ class TelegramAuthRequest(BaseModel):
 
 
 class UserTermsAcceptRequest(BaseModel):
-    """Richiesta di accettazione termini e condizioni del servizio."""
+    """Richiesta di accettazione termini e condizioni della Mini App."""
+
     accepted: bool = Field(
         ...,
         description="Flag di accettazione delle condizioni d'uso e privacy",
@@ -47,21 +48,9 @@ class UserTermsAcceptRequest(BaseModel):
         return v
 
 
-class TelegramWidgetAuthRequest(BaseModel):
-    """Payload di autenticazione ricevuto dal Telegram Login Widget (Web)."""
-    id: int = Field(..., description="Telegram User ID")
-    first_name: Optional[str] = Field(default=None, description="Nome Telegram")
-    last_name: Optional[str] = Field(default=None, description="Cognome Telegram")
-    username: Optional[str] = Field(default=None, description="Username Telegram")
-    photo_url: Optional[str] = Field(default=None, description="Foto profilo Telegram")
-    auth_date: int = Field(..., description="Timestamp Unix di autorizzazione")
-    hash: str = Field(..., description="Firma crittografica HMAC-SHA256 calcolata da Telegram")
-    referral_code: Optional[str] = Field(default=None, min_length=6, max_length=16)
-    accepted: bool = Field(default=True, description="Conferma accettazione termini")
-
-
 class UserCreate(BaseModel):
     """Schema per la creazione interna di un nuovo utente nel database."""
+
     user_key: str = Field(
         ...,
         min_length=64,
@@ -74,9 +63,9 @@ class UserCreate(BaseModel):
         max_length=16,
         description="Codice referral generato univoco per l'utente",
     )
-    referred_by_id: Optional[uuid.UUID] = Field(
+    referred_by_id: Optional[int] = Field(
         default=None,
-        description="UUID dell'utente che ha effettuato l'invito",
+        description="ID dell'utente che ha effettuato l'invito",
     )
     terms_accepted_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
@@ -116,6 +105,7 @@ class UserCreate(BaseModel):
 
 class UserStatusUpdateRequest(BaseModel):
     """Richiesta di aggiornamento stato utente (moderazione / ban)."""
+
     status: UserStatus = Field(
         ...,
         description="Nuovo stato dell'account",
@@ -133,6 +123,7 @@ class UserStatusUpdateRequest(BaseModel):
 
 class UserResponse(BaseModel):
     """Schema di risposta pubblico per il profilo dell'utente."""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int

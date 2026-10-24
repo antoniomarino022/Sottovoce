@@ -1,10 +1,12 @@
-from typing import Any, cast
+from typing import Any, cast,Optional
 
 from langchain_core.messages import AIMessage
 from langchain_core.prompts import ChatPromptTemplate
 
 from config.llm import creative_llm, triage_llm
 from src.agents.guardrails import (
+    DEFAULT_FALLBACK,
+    FALLBACK_RESPONSES,
     AgentName,
     enforce_triage_guardrails,
     validate_agent_output_guardrails,
@@ -62,11 +64,15 @@ async def _run_persona(
     **prompt_vars: str,
 ) -> dict[str, Any]:
     """Invoke the creative LLM for a courtroom persona and sanitize its output."""
-    messages = prompt.format_messages(**prompt_vars)
-    response = await creative_llm.ainvoke(messages)
+    try:
+        messages = prompt.format_messages(**prompt_vars)
+        response = await creative_llm.ainvoke(messages)
+        raw_text = _as_text(response.content)
+    except Exception:
+        raw_text = FALLBACK_RESPONSES.get(agent_name, DEFAULT_FALLBACK)
 
     _, sanitized_text, output_violations = validate_agent_output_guardrails(
-        agent_name, _as_text(response.content)
+        agent_name, raw_text
     )
 
     return {
@@ -111,17 +117,29 @@ async def triage_node(state: ConfessionState) -> dict[str, Any]:
         )
         result, mod_status, triage_violations = enforce_triage_guardrails(raw_result)
 
-        return _triage_update(
+        ai_roast: Optional[str] = None
+        output_violations: list[str] = []
+        if mod_status == "approved" and result.ai_roast:
+            _, sanitized_roast, out_viols = validate_agent_output_guardrails(
+                "judge", result.ai_roast
+            )
+            ai_roast = sanitized_roast
+            output_violations = out_viols
+
+        update = _triage_update(
             mod_status=mod_status,
             severity=result.severity,
             roast_allowed=result.roast_allowed,
             reason=result.reason,
-            violations=existing + input_violations + triage_violations,
+            violations=existing + input_violations + triage_violations + output_violations,
             message=(
                 f"Triage Decision: status={mod_status}, "
                 f"severity={result.severity}, reason={result.reason}"
             ),
         )
+        if ai_roast:
+            update["ai_roast"] = ai_roast
+        return update
 
     # Fail closed: any triage error blocks the content
     except Exception as exc:
@@ -129,9 +147,9 @@ async def triage_node(state: ConfessionState) -> dict[str, Any]:
             mod_status="crisis_held",
             severity=10,
             roast_allowed=False,
-            reason=f"Fail-closed trigger engaged due to triage failure or timeout: {exc}",
-            violations=existing + input_violations + ["triage_exception_fail_closed"],
-            message="Fail-closed safety policy triggered due to triage error or timeout.",
+            reason=f"Fail-closed trigger engaged: LLM classification unavailable ({exc})",
+            violations=existing + input_violations + ["fail_closed_error"],
+            message="Fail-closed safety trigger engaged.",
         )
 
 
@@ -141,7 +159,9 @@ async def triage_node(state: ConfessionState) -> dict[str, Any]:
 
 
 async def judge_node(state: ConfessionState) -> dict[str, Any]:
-    """Deliver the satirical roast, if triage allowed it."""
+    """Deliver the satirical roast. If already generated in single-pass triage, re-use it immediately."""
+    if state.get("ai_roast"):
+        return {"ai_roast": state.get("ai_roast")}
     if not state.get("roast_allowed", False):
         return {"ai_roast": None}
 

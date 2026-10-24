@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from src.models.enums import (
     ModerationStatus,
     PostStyle,
+    ReactionType,
     ShameBadge,
 )
 
@@ -14,8 +15,6 @@ class ConfessionCreate(BaseModel):
     """Schema per la persistenza di una nuova confessione nel database."""
     author_id: Optional[int] = Field(default=None, description="ID dell'autore della confessione (assegnato dal server)")
     content: str = Field(..., min_length=10, max_length=2000)
-    poll_option_a: Optional[str] = Field(default=None, max_length=80)
-    poll_option_b: Optional[str] = Field(default=None, max_length=80)
     mod_status: ModerationStatus = Field(default=ModerationStatus.PENDING_AI)
     severity: int = Field(default=0, ge=0)
 
@@ -81,16 +80,15 @@ class ConfessionResponse(BaseModel):
     visual_style: PostStyle
     shame_stamp: ShameBadge
     pinned_until: Optional[datetime] = None
-    weekly_rank: Optional[int] = None
-    poll_option_a: Optional[str] = None
-    poll_option_b: Optional[str] = None
-    poll_votes_a: int
-    poll_votes_b: int
+    weekly_rank: Optional[int] = Field(default=None)
     count_skull: int
     count_disagio: int
     count_popcorn: int
     count_clown: int
     total_reactions: Optional[int] = None
     reports_count: int
+    shares_count: int = 0
+    user_reaction: Optional[ReactionType] = None
+    is_author: Optional[bool] = None
     created_at: datetime
     deleted_at: Optional[datetime] = None

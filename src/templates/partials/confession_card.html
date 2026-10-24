@@ -1,0 +1,121 @@
+{% from "macros/ui.html" import icon %}
+
+<article id="confession-card-{{ c.id }}" class="bg-section border border-sep rounded-xl p-4 flex flex-col gap-3 transition-opacity">
+  <!-- Header: #id and time -->
+  <div class="flex items-center justify-between text-xs text-hint">
+    <div class="flex items-center gap-1.5 font-medium">
+      <span class="text-text">#{{ c.id }}</span>
+      {% if c.weekly_rank == 1 %}
+        <span class="text-accent-text font-bold text-[11px] bg-secondary px-1.5 py-0.5 rounded">🥇 1° Podio</span>
+      {% elif c.weekly_rank == 2 %}
+        <span class="text-hint font-bold text-[11px] bg-secondary px-1.5 py-0.5 rounded">🥈 2° Podio</span>
+      {% elif c.weekly_rank == 3 %}
+        <span class="text-hint font-bold text-[11px] bg-secondary px-1.5 py-0.5 rounded">🥉 3° Podio</span>
+      {% endif %}
+      {% if c.pinned_until %}
+        <span class="text-accent-text font-semibold text-[11px] bg-secondary px-1.5 py-0.5 rounded">📌 Fissato</span>
+      {% endif %}
+    </div>
+    <div class="flex items-center gap-2">
+      <span>{{ c.created_at.strftime('%d/%m %H:%M') if c.created_at else '' }}</span>
+      {% if c.is_author %}
+        <button
+          hx-delete="/confessions/{{ c.id }}"
+          hx-target="#confession-card-{{ c.id }}"
+          hx-swap="outerHTML"
+          hx-confirm="Vuoi davvero eliminare questa confessione?"
+          class="text-danger p-1 active:opacity-60"
+          title="Elimina la tua confessione"
+        >
+          {{ icon("trash", "size-4") }}
+        </button>
+      {% else %}
+        <button
+          hx-post="/confessions/{{ c.id }}/reports"
+          hx-vals='{"reason": "abuse"}'
+          hx-target="this"
+          hx-swap="outerHTML"
+          hx-confirm="Vuoi segnalare questa confessione ai moderatori?"
+          class="text-hint active:text-danger p-1 text-[11px] flex items-center gap-1"
+          title="Segnala contenuto"
+        >
+          {{ icon("flag", "size-3.5") }}
+        </button>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Confession Body -->
+  <p class="text-[16px] text-text whitespace-pre-wrap leading-relaxed select-text">{{ c.content }}</p>
+
+  <!-- Sentenza del Giudice (Roast) -->
+  {% if c.ai_roast %}
+    <div class="bg-secondary rounded-lg p-3 text-[14px] border-l-2 border-accent flex flex-col gap-1">
+      <div class="text-[11px] font-semibold uppercase tracking-wider text-accent-text flex items-center gap-1">
+        <span>⚖️</span> <span>Sentenza della Corte</span>
+      </div>
+      <p class="text-text italic leading-snug select-text">"{{ c.ai_roast }}"</p>
+    </div>
+  {% endif %}
+
+  <!-- Difesa dell'Avvocato (se presente) -->
+  {% if c.ai_defense %}
+    <div class="bg-secondary rounded-lg p-3 text-[14px] border-l-2 border-link flex flex-col gap-1">
+      <div class="text-[11px] font-semibold uppercase tracking-wider text-link flex items-center gap-1">
+        <span>🛡️</span> <span>Arringa Difensiva</span>
+      </div>
+      <p class="text-text italic leading-snug select-text">"{{ c.ai_defense }}"</p>
+    </div>
+  {% endif %}
+
+  <!-- Requisitoria dell'Accusa (se presente) -->
+  {% if c.ai_prosecution %}
+    <div class="bg-secondary rounded-lg p-3 text-[14px] border-l-2 border-danger flex flex-col gap-1">
+      <div class="text-[11px] font-semibold uppercase tracking-wider text-danger flex items-center gap-1">
+        <span>⚔️</span> <span>Requisitoria del Pubblico Ministero</span>
+      </div>
+      <p class="text-text italic leading-snug select-text">"{{ c.ai_prosecution }}"</p>
+    </div>
+  {% endif %}
+
+  <!-- Bottoni On-Demand per Difesa e Accusa se non ancora generate -->
+  {% if c.mod_status.value == 'approved' and c.ai_roast and (not c.ai_defense or not c.ai_prosecution) %}
+    <div class="flex items-center gap-2 pt-1 border-t border-sep">
+      {% if not c.ai_defense %}
+        <button
+          hx-post="/confessions/{{ c.id }}/defense"
+          hx-target="#confession-card-{{ c.id }}"
+          hx-swap="outerHTML"
+          hx-disabled-elt="this"
+          class="text-xs font-medium text-link py-1.5 px-3 rounded-lg bg-secondary active:bg-press flex items-center gap-1.5 transition-all"
+        >
+          <span class="htmx-indicator animate-pulse">⏳</span>
+          <span class="htmx-indicator">L'Avvocato prepara la difesa...</span>
+          <span class="htmx-hide-on-request">🛡️</span>
+          <span class="htmx-hide-on-request">Chiama Difesa (20 🪙)</span>
+        </button>
+      {% endif %}
+      {% if not c.ai_prosecution %}
+        <button
+          hx-post="/confessions/{{ c.id }}/prosecution"
+          hx-target="#confession-card-{{ c.id }}"
+          hx-swap="outerHTML"
+          hx-disabled-elt="this"
+          class="text-xs font-medium text-danger py-1.5 px-3 rounded-lg bg-secondary active:bg-press flex items-center gap-1.5 transition-all"
+        >
+          <span class="htmx-indicator animate-pulse">⏳</span>
+          <span class="htmx-indicator">Il PM formula l'accusa...</span>
+          <span class="htmx-hide-on-request">⚔️</span>
+          <span class="htmx-hide-on-request">Invoca Accusa (20 🪙)</span>
+        </button>
+      {% endif %}
+    </div>
+  {% endif %}
+
+  <!-- Barra Reazioni HTMX -->
+  {% include "partials/reaction_bar.html" %}
+
+  {% if user and user.coins_balance is defined %}
+    <span id="user-coins-display" hx-swap-oob="true" class="user-coins-display text-hint font-medium">{{ user.coins_balance }} 🪙</span>
+  {% endif %}
+</article>

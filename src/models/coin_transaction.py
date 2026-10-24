@@ -1,6 +1,5 @@
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Optional
-import uuid
 
 import sqlalchemy as sa
 from sqlmodel import Column, Field, Relationship, SQLModel

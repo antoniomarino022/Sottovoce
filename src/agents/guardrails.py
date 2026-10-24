@@ -108,6 +108,7 @@ def enforce_triage_guardrails(
         severity=severity,
         roast_allowed=roast_allowed,
         reason=triage_result.reason,
+        ai_roast=triage_result.ai_roast if (roast_allowed and status == "approved") else None,
     )
     return enforced_result, status, [violation] if violation else []
 
@@ -161,6 +162,8 @@ def validate_agent_output_guardrails(
 
 
 __all__ = [
+    "DEFAULT_FALLBACK",
+    "FALLBACK_RESPONSES",
     "validate_input_guardrails",
     "enforce_triage_guardrails",
     "validate_agent_output_guardrails",

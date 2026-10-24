@@ -2,7 +2,6 @@ from src.models.coin_transaction import CoinTransaction
 from src.models.confession import Confession
 from src.models.enums import (
     ModerationStatus,
-    PollChoice,
     PostStyle,
     ReactionType,
     ShameBadge,
@@ -11,7 +10,6 @@ from src.models.enums import (
     UserStatus,
     pg_enum,
 )
-from src.models.poll_vote import PollVote
 from src.models.reaction import Reaction
 from src.models.report import Report
 from src.models.user import User
@@ -22,7 +20,6 @@ __all__ = [
     "ModerationStatus",
     "TriageCategory",
     "ReactionType",
-    "PollChoice",
     "PostStyle",
     "ShameBadge",
     "TxType",
@@ -31,7 +28,6 @@ __all__ = [
     "User",
     "Confession",
     "Reaction",
-    "PollVote",
     "Report",
     "CoinTransaction",
 ]
