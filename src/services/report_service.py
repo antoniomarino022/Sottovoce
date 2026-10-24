@@ -8,7 +8,7 @@ from src.models import Confession, Report
 from src.models.enums import ModerationStatus, TriageCategory
 from src.services.redis_service import invalidate_feed_cache
 
-logger = logging.getLogger("hotmic.report_service")
+logger = logging.getLogger("sottovoce.report_service")
 
 # Threshold of reports required to automatically hide content pending review
 REPORT_AUTO_MOD_THRESHOLD = 3

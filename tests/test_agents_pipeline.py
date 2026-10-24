@@ -1,4 +1,4 @@
-"""Comprehensive unit tests for Hot-Mic agents, guardrails, prompts, and memory."""
+"""Comprehensive unit tests for Sottovoce agents, guardrails, prompts, and memory."""
 
 from datetime import datetime, timezone
 from unittest import IsolatedAsyncioTestCase, main

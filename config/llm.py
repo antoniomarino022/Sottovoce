@@ -1,4 +1,4 @@
-"""Centralized LLM configurations for the Hot-Mic multi-agent pipeline."""
+"""Centralized LLM configurations for the Sottovoce multi-agent pipeline."""
 
 from langchain_deepseek import ChatDeepSeek
 

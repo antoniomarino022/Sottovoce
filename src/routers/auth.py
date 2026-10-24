@@ -43,7 +43,7 @@ async def register(
 
     is_https = request.url.scheme == "https" or settings.is_serverless
     response.set_cookie(
-        key="hotmic_session",
+        key="sottovoce_session",
         value=user.user_key,
         httponly=True,
         secure=is_https,

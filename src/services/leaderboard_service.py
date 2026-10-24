@@ -10,7 +10,7 @@ from src.models import CoinTransaction, Confession, User
 from src.models.enums import ModerationStatus, TxType
 from src.services.redis_service import get_cache, invalidate_feed_cache, set_cache
 
-logger = logging.getLogger("hotmic.leaderboard_service")
+logger = logging.getLogger("sottovoce.leaderboard_service")
 
 PODIUM_REWARDS = {
     1: 200,
@@ -33,7 +33,7 @@ async def _get_weekly_leaderboard(
     """Fetch top confessions in a single query, prioritizing the current week
     and seamlessly filling remaining slots from all-time if < limit exist.
     """
-    cache_key = f"hotmic:leaderboard:{cache_prefix}:{limit}:{days}"
+    cache_key = f"sottovoce:leaderboard:{cache_prefix}:{limit}:{days}"
     cached = await get_cache(cache_key)
     if cached is not None:
         return cached

@@ -9,7 +9,7 @@ from src.models import User
 from src.routers.deps import get_current_user
 from src.services.ad_service import COOLDOWN_SECONDS, claim_ad_reward_service
 
-logger = logging.getLogger("hotmic.ad_router")
+logger = logging.getLogger("sottovoce.ad_router")
 
 router = APIRouter(prefix="/ads", tags=["Ads & Monetization"])
 

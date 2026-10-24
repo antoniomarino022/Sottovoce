@@ -81,7 +81,7 @@ class TestReactionCRUD(unittest.TestCase):
 
     def test_post_reaction_create(self):
         """Aggiunge una nuova reazione e verifica l'incremento del contatore."""
-        client = TestClient(app, cookies={"hotmic_session": "user_key_alpha_1"})
+        client = TestClient(app, cookies={"sottovoce_session": "user_key_alpha_1"})
         response = client.post(
             f"/confessions/{self.confession_id}/reactions",
             json={"type": "skull"},
@@ -101,7 +101,7 @@ class TestReactionCRUD(unittest.TestCase):
 
     def test_post_reaction_switch(self):
         """Passa da una reazione all'altra (skull -> clown) e controlla i contatori."""
-        client = TestClient(app, cookies={"hotmic_session": "user_key_alpha_1"})
+        client = TestClient(app, cookies={"sottovoce_session": "user_key_alpha_1"})
         # 1. Crea reazione 'skull'
         res1 = client.post(
             f"/confessions/{self.confession_id}/reactions",
@@ -125,7 +125,7 @@ class TestReactionCRUD(unittest.TestCase):
 
     def test_post_reaction_toggle_off(self):
         """Inviare la stessa reazione una seconda volta la rimuove (toggle)."""
-        client = TestClient(app, cookies={"hotmic_session": "user_key_alpha_1"})
+        client = TestClient(app, cookies={"sottovoce_session": "user_key_alpha_1"})
         # 1. Imposta 'disagio'
         res1 = client.post(
             f"/confessions/{self.confession_id}/reactions",
@@ -154,8 +154,8 @@ class TestReactionCRUD(unittest.TestCase):
 
     def test_get_reactions_summary_and_me(self):
         """Verifica GET riepilogo reazioni e GET /me."""
-        client1 = TestClient(app, cookies={"hotmic_session": "user_key_alpha_1"})
-        client2 = TestClient(app, cookies={"hotmic_session": "user_key_beta_2"})
+        client1 = TestClient(app, cookies={"sottovoce_session": "user_key_alpha_1"})
+        client2 = TestClient(app, cookies={"sottovoce_session": "user_key_beta_2"})
 
         # Utente 1 reagisce popcorn
         client1.post(
@@ -191,7 +191,7 @@ class TestReactionCRUD(unittest.TestCase):
 
     def test_delete_reaction(self):
         """Elimina esplicitamente una reazione via DELETE."""
-        client = TestClient(app, cookies={"hotmic_session": "user_key_alpha_1"})
+        client = TestClient(app, cookies={"sottovoce_session": "user_key_alpha_1"})
         client.post(
             f"/confessions/{self.confession_id}/reactions",
             json={"type": "skull"},
@@ -209,7 +209,7 @@ class TestReactionCRUD(unittest.TestCase):
 
     def test_reactions_nonexistent_confession_404(self):
         """Richieste su confessione inesistente restituiscono 404."""
-        client = TestClient(app, cookies={"hotmic_session": "user_key_alpha_1"})
+        client = TestClient(app, cookies={"sottovoce_session": "user_key_alpha_1"})
         res = client.post("/confessions/99999/reactions", json={"type": "skull"})
         self.assertEqual(res.status_code, 404)
 
@@ -236,7 +236,7 @@ class TestReactionCRUD(unittest.TestCase):
 
     def test_post_reaction_htmx_form_urlencoded(self):
         """Simula il click HTMX (application/x-www-form-urlencoded da hx-vals) senza errore 422/[object Object]."""
-        client = TestClient(app, cookies={"hotmic_session": "user_key_alpha_1"})
+        client = TestClient(app, cookies={"sottovoce_session": "user_key_alpha_1"})
         res = client.post(
             f"/confessions/{self.confession_id}/reactions",
             data={"type": "skull"},

@@ -1,4 +1,4 @@
-"""Hot-Mic autonomous multi-agent judicial package."""
+"""Sottovoce autonomous multi-agent judicial package."""
 
 from src.agents.graph import (
     defense_workflow,

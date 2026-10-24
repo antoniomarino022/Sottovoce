@@ -30,7 +30,7 @@ from src.routers import (
     telegram_router,
 )
 
-logger = logging.getLogger("hotmic")
+logger = logging.getLogger("sottovoce")
 logging.basicConfig(level=logging.INFO)
 
 
@@ -78,8 +78,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Hot-Mic",
-    description="Anonymous confession platform with AI Roast Judge and Telegram Auth",
+    title="Sottovoce",
+    description="Telegram Mini App di confessioni anonime con Tribunale satirico AI",
     version="0.1.0",
     lifespan=lifespan,
 )
@@ -104,7 +104,7 @@ app.include_router(ad_router)
 @app.get("/health", tags=["Health"])
 async def health_check():
     """Health check endpoint."""
-    return {"status": "ok", "app": "Hot-Mic"}
+    return {"status": "ok", "app": "Sottovoce"}
 
 
 if __name__ == "__main__":

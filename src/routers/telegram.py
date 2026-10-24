@@ -8,7 +8,7 @@ from fastapi import APIRouter, Header, HTTPException, Request, status
 from config.settings import settings
 from src.telegram.init import dp
 
-logger = logging.getLogger("hotmic.telegram.webhook")
+logger = logging.getLogger("sottovoce.telegram.webhook")
 router = APIRouter(prefix="/telegram", tags=["Telegram Bot Webhook"])
 
 _bot_instance: Bot | None = None

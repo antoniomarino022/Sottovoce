@@ -57,7 +57,7 @@ function syncRegisterGate() {
 window.handleTmaLogin = async function () {
   setAuthError(null);
   if (!tg?.initData) {
-    setAuthError("Apri Hot-Mic direttamente da Telegram per accedere.");
+    setAuthError("Apri Sottovoce direttamente da Telegram per accedere.");
     tg?.HapticFeedback?.notificationOccurred("error");
     return;
   }
@@ -292,8 +292,8 @@ function syncNavigationState() {
   syncMainButton();
 }
 
-if (!window.__hotmic_initialized) {
-  window.__hotmic_initialized = true;
+if (!window.__sottovoce_initialized) {
+  window.__sottovoce_initialized = true;
 
   if (tg) {
     document.documentElement.dataset.tg = "";
@@ -370,8 +370,8 @@ syncNavigationState();
 // 3. Telegram Share & Adsgram Rewarded Video
 // ---------------------------------------------------------------------------
 window.shareConfession = function (id, snippet) {
-  const shareText = `Guarda questo segreto anonimo su Hot-Mic! 🔥\n\n"${snippet}"\n\nScopri di più:`;
-  const shareUrl = `https://t.me/${window.BOT_USERNAME || "HotMicBot"}/app?startapp=confession_${id}`;
+  const shareText = `Guarda questo segreto anonimo su Sottovoce! 🤫\n\n"${snippet}"\n\nScopri di più:`;
+  const shareUrl = `https://t.me/${window.BOT_USERNAME || "SottovoceBot"}/app?startapp=confession_${id}`;
 
   fetch(`/confessions/${id}/share`, {
     method: "POST",

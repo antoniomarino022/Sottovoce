@@ -391,8 +391,8 @@ async def _feed_cache_key(
                 status.HTTP_401_UNAUTHORIZED,
                 "Authentication required to view personal confessions",
             )
-        return f"hotmic:feed:v{ver}:my:{current_user_id}:{limit}:{offset}"
-    return f"hotmic:feed:v{ver}:{feed_type}:{limit}:{offset}"
+        return f"sottovoce:feed:v{ver}:my:{current_user_id}:{limit}:{offset}"
+    return f"sottovoce:feed:v{ver}:{feed_type}:{limit}:{offset}"
 
 
 def _build_feed_query(feed_type: FeedType, current_user_id: Optional[int]):

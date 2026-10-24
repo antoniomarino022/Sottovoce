@@ -70,11 +70,11 @@ class TelegramAuthService:
     def generate_unique_referral_code(cls, session: Session) -> str:
         """Generate a cryptographically secure, unique 8-character referral code."""
         for _ in range(10):
-            candidate = f"HM{secrets.token_hex(3).upper()}"
+            candidate = f"SV{secrets.token_hex(3).upper()}"
             existing = session.exec(select(User).where(User.referral_code == candidate)).first()
             if not existing:
                 return candidate
-        return f"HM{secrets.token_hex(5).upper()}"
+        return f"SV{secrets.token_hex(5).upper()}"
 
     @classmethod
     def get_or_create_user_by_telegram_id(

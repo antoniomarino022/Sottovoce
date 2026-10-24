@@ -8,7 +8,7 @@ from sqlmodel import Session, select
 from src.models import Confession, Reaction
 from src.models.enums import ReactionType
 
-logger = logging.getLogger("hotmic.reaction_service")
+logger = logging.getLogger("sottovoce.reaction_service")
 
 
 def _refresh_if_expired(session: Session, obj: Any) -> None:

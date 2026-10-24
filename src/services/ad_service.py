@@ -8,7 +8,7 @@ from sqlmodel import Session
 from src.models import CoinTransaction, User
 from src.models.enums import TxType
 
-logger = logging.getLogger("hotmic.ad_service")
+logger = logging.getLogger("sottovoce.ad_service")
 
 REWARD_PER_AD = 20
 COOLDOWN_SECONDS = 10  # Minimo intervallo tra un annuncio e il successivo

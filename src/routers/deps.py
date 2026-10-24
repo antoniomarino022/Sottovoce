@@ -24,7 +24,7 @@ def extract_raw_init_data(
 
 async def get_current_user(
     raw_init_data: Optional[str] = Depends(extract_raw_init_data),
-    hotmic_session: Optional[str] = Cookie(None, description="Mini App SSR session cookie"),
+    sottovoce_session: Optional[str] = Cookie(None, description="Mini App SSR session cookie"),
     session: Session = Depends(get_session),
 ) -> User:
     """Resolve the current Telegram Mini App user from signed initData (or SSR session cookie)."""
@@ -35,8 +35,8 @@ async def get_current_user(
         )
         return user
 
-    if hotmic_session:
-        user = session.exec(select(User).where(User.user_key == hotmic_session)).first()
+    if sottovoce_session:
+        user = session.exec(select(User).where(User.user_key == sottovoce_session)).first()
         if user:
             if user.status == UserStatus.BANNED:
                 raise HTTPException(
@@ -47,20 +47,20 @@ async def get_current_user(
 
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Accesso non autorizzato. Apri Hot-Mic da Telegram.",
+        detail="Accesso non autorizzato. Apri Sottovoce da Telegram.",
     )
 
 
 async def get_optional_current_user(
     raw_init_data: Optional[str] = Depends(extract_raw_init_data),
-    hotmic_session: Optional[str] = Cookie(None),
+    sottovoce_session: Optional[str] = Cookie(None),
     session: Session = Depends(get_session),
 ) -> Optional[User]:
     """Optional dependency for Mini App pages and public endpoints."""
     try:
         return await get_current_user(
             raw_init_data=raw_init_data,
-            hotmic_session=hotmic_session,
+            sottovoce_session=sottovoce_session,
             session=session,
         )
     except HTTPException:

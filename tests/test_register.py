@@ -79,7 +79,7 @@ class TestRegisterAndAuth(unittest.TestCase):
         self.assertIn("telegram-web-app.js", html)
         self.assertNotIn("telegram-widget.js", html)
         self.assertNotIn("handleLogout", html)
-        self.assertIn("Hot-Mic", html)
+        self.assertIn("Sottovoce", html)
         self.assertIn("Confessioni anonime", html)
 
     def test_2_tma_auth_flow(self):
@@ -99,13 +99,13 @@ class TestRegisterAndAuth(unittest.TestCase):
         self.assertIsInstance(user_data["id"], int)
         self.assertIn("user_key", user_data)
         self.assertNotIn("telegram_id", user_data)
-        self.assertIn("hotmic_session", res.cookies)
+        self.assertIn("sottovoce_session", res.cookies)
 
         # Utente già autenticato su /register viene reindirizzato direttamente al feed (/)
-        session_cookie = res.cookies["hotmic_session"]
+        session_cookie = res.cookies["sottovoce_session"]
         res_page = self.client.get(
             "/register",
-            cookies={"hotmic_session": session_cookie},
+            cookies={"sottovoce_session": session_cookie},
             follow_redirects=False,
         )
         self.assertEqual(res_page.status_code, 302)
@@ -183,14 +183,14 @@ class TestRegisterAndAuth(unittest.TestCase):
 
             res_def = self.client.post(
                 f"/confessions/{cid}/defense",
-                cookies={"hotmic_session": cookie},
+                cookies={"sottovoce_session": cookie},
             )
             self.assertEqual(res_def.status_code, 200)
             self.assertIn("Nessuno legge mai i termini", res_def.json()["ai_defense"])
 
             res_pros = self.client.post(
                 f"/confessions/{cid}/prosecution",
-                cookies={"hotmic_session": cookie},
+                cookies={"sottovoce_session": cookie},
             )
             self.assertEqual(res_pros.status_code, 200)
             self.assertIn("pericolo pubblico", res_pros.json()["ai_prosecution"])
@@ -202,18 +202,18 @@ class TestRegisterAndAuth(unittest.TestCase):
             self.assertIsNotNone(user)
             cookie = user.user_key
 
-        res_page = self.client.get("/", cookies={"hotmic_session": cookie})
+        res_page = self.client.get("/", cookies={"sottovoce_session": cookie})
         self.assertEqual(res_page.status_code, 200)
-        self.assertIn("Hot-Mic", res_page.text)
+        self.assertIn("Sottovoce", res_page.text)
         self.assertIn("feed-list", res_page.text)
         self.assertIn("Popolari", res_page.text)
         self.assertIn("Recenti", res_page.text)
 
-        res_conf = self.client.get("/confession", cookies={"hotmic_session": cookie})
+        res_conf = self.client.get("/confession", cookies={"sottovoce_session": cookie})
         self.assertEqual(res_conf.status_code, 200)
         self.assertNotIn("handleLogout", res_conf.text)
 
-        res_api = self.client.get("/confessions/", cookies={"hotmic_session": cookie})
+        res_api = self.client.get("/confessions/", cookies={"sottovoce_session": cookie})
         self.assertEqual(res_api.status_code, 200)
         data = res_api.json()
         self.assertIsInstance(data, list)

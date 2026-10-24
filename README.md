@@ -1,7 +1,7 @@
-# 🎙️ Hot-Mic
+# 🤫 Sottovoce
 
-> **Piattaforma di confessioni anonime interattiva con AI Roast Judge, Telegram Mini App e Privacy-First by Design.**  
-> *Architettura cloud-native serverless basata su FastAPI, Neon PostgreSQL e deployment su Vercel.*
+> **Telegram Mini App di confessioni anonime con Tribunale satirico AI (Giudice, Difesa e Accusa) e Privacy-First by Design.**  
+> *Architettura cloud-native serverless basata su FastAPI, Neon PostgreSQL, Upstash Redis e deployment su Vercel.*
 
 [![Python](https://img.shields.io/badge/Python-3.12%20%7C%203.14-blue.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.159+-009688.svg)](https://fastapi.tiangolo.com/)
@@ -31,7 +31,7 @@
 
 ## 💡 1. Panoramica del Progetto
 
-**Hot-Mic** (concept: *DisagioLab*) è una piattaforma di confessioni anonime interattiva concepita come applicazione ibrida:
+**Sottovoce** (concept: *DisagioLab*) è una piattaforma di confessioni anonime interattiva concepita come applicazione ibrida:
 
 - 🌐 **Web App Classica**: Accessibile via browser desktop/mobile tramite autenticazione Telegram.
 - 📱 **Telegram Mini App (TMA)**: Integrata nativamente nell'ecosistema di Telegram tramite Bot (`aiogram`) e iframe dedicato.
@@ -59,7 +59,7 @@ Il sistema unisce un feed di post anonimi a un motore di intelligenza artificial
 
 ## 🔐 3. Architettura di Autenticazione e Privacy
 
-Per evitare violazioni GDPR e garantire il vero anonimato anche in caso di compromissione del database, Hot-Mic adotta un **modello di identità pseudonima non invertibile basato su HMAC**.
+Per evitare violazioni GDPR e garantire il vero anonimato anche in caso di compromissione del database, Sottovoce adotta un **modello di identità pseudonima non invertibile basato su HMAC**.
 
 ```mermaid
 sequenceDiagram
@@ -497,4 +497,4 @@ from router.app import app
 ## ⚖️ 9. Disclaimer Legale
 
 Nel footer dell'applicazione e nella schermata di benvenuto della Telegram Mini App deve essere presente il seguente avviso:
-> *"I commenti generati dall'Intelligenza Artificiale hanno esclusivo scopo satirico e d'intrattenimento. Hot-Mic non fornisce consulenza psicologica, medica o legale. In caso di reale disagio emotivo o emergenza, si invita a contattare i numeri gratuiti di supporto indicati nella piattaforma (es. 1522 o Telefono Amico)."*
+> *"I commenti generati dall'Intelligenza Artificiale hanno esclusivo scopo satirico e d'intrattenimento. Sottovoce non fornisce consulenza psicologica, medica o legale. In caso di reale disagio emotivo o emergenza, si invita a contattare i numeri gratuiti di supporto indicati nella piattaforma (es. 1522 o Telefono Amico)."*

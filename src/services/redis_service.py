@@ -7,13 +7,13 @@ from urllib.parse import urlparse, urlunparse
 import redis.asyncio as aioredis
 from config.settings import settings
 
-logger = logging.getLogger("hotmic.redis")
+logger = logging.getLogger("sottovoce.redis")
 
 # Bounded in-memory fallback for local dev or temporary Redis outages
 _MAX_MEMORY_CACHE_SIZE = 1000
 _MAX_MEMORY_RL_SIZE = 2000
 _REDIS_COOLDOWN_SECONDS = 30.0
-_FEED_VERSION_KEY = "hotmic:feed:ver"
+_FEED_VERSION_KEY = "sottovoce:feed:ver"
 
 _memory_cache: dict[str, tuple[Any, float]] = {}
 _memory_rate_limits: dict[str, list[float]] = {}
@@ -157,7 +157,7 @@ async def invalidate_feed_cache() -> None:
 
 async def delete_cache_pattern(pattern: str) -> None:
     """Compatibility helper to remove matching keys."""
-    if pattern == "hotmic:feed:*":
+    if pattern == "sottovoce:feed:*":
         await invalidate_feed_cache()
         return
 
@@ -184,7 +184,7 @@ async def delete_cache_pattern(pattern: str) -> None:
 async def check_rate_limit(key: str, max_requests: int = 10, window_seconds: int = 60) -> bool:
     """Sliding-window rate limiter using Redis pipeline or bounded in-memory fallback."""
     client = _get_redis()
-    rl_key = f"hotmic:ratelimit:{key}"
+    rl_key = f"sottovoce:ratelimit:{key}"
 
     if client:
         try:

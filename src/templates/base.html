@@ -8,12 +8,12 @@
   <script src="https://sad.adsgram.ai/js/sad.min.js" async></script>
   <link rel="stylesheet" href="{{ url_for('static', path='app.css') }}">
   <script>
-    window.BOT_USERNAME = "{{ bot_username or 'HotMicBot' }}";
+    window.BOT_USERNAME = "{{ bot_username or 'SottovoceBot' }}";
     window.ADSGRAM_BLOCK_ID = "{{ adsgram_block_id or '' }}";
   </script>
   <script src="{{ url_for('static', path='htmx.min.js') }}" defer></script>
   <script src="{{ url_for('static', path='tg.js') }}" defer></script>
-  <title>{% block title %}Hot-Mic{% endblock %}</title>
+  <title>{% block title %}Sottovoce{% endblock %}</title>
   {% block head %}{% endblock %}
 </head>
 <body class="min-h-dvh flex flex-col bg-secondary text-text"

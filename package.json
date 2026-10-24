@@ -1,7 +1,7 @@
 {
-  "name": "hot-mic",
+  "name": "sottovoce",
   "version": "1.0.0",
-  "description": "Hot-Mic anonymous confessions platform",
+  "description": "Sottovoce Telegram Mini App anonymous confessions platform",
   "scripts": {
     "build": "tailwindcss -i src/static/src.css -o src/static/app.css --minify",
     "watch": "tailwindcss -i src/static/src.css -o src/static/app.css --watch"

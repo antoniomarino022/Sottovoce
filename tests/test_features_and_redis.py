@@ -111,9 +111,9 @@ class TestFeaturesAndRedis(unittest.TestCase):
 
     def test_reporting_and_auto_moderation(self):
         """Test user reporting, duplicate prevention, and auto-moderation threshold."""
-        client1 = TestClient(app, cookies={"hotmic_session": "key_user_one"})
-        client2 = TestClient(app, cookies={"hotmic_session": "key_user_two"})
-        client3 = TestClient(app, cookies={"hotmic_session": "key_user_three"})
+        client1 = TestClient(app, cookies={"sottovoce_session": "key_user_one"})
+        client2 = TestClient(app, cookies={"sottovoce_session": "key_user_two"})
+        client3 = TestClient(app, cookies={"sottovoce_session": "key_user_three"})
 
         # 1. User 2 reports confession
         res1 = client2.post(
@@ -157,7 +157,7 @@ class TestFeaturesAndRedis(unittest.TestCase):
 
     def test_coins_deduction_for_powers(self):
         """Test that invoking defense and prosecution deducts coins and records transactions."""
-        client = TestClient(app, cookies={"hotmic_session": "key_user_one"})
+        client = TestClient(app, cookies={"sottovoce_session": "key_user_one"})
 
         with patch("src.agents.nodes.creative_llm") as mock_creative:
             mock_creative.ainvoke = AsyncMock(
@@ -189,7 +189,7 @@ class TestFeaturesAndRedis(unittest.TestCase):
                 self.assertEqual(u1.coins_balance, 60)
 
         # Test user with insufficient coins (User 3 has only 10 coins)
-        client_poor = TestClient(app, cookies={"hotmic_session": "key_user_three"})
+        client_poor = TestClient(app, cookies={"sottovoce_session": "key_user_three"})
         with patch("src.agents.nodes.creative_llm") as mock_creative:
             mock_creative.ainvoke = AsyncMock(return_value=AIMessage(content="Test"))
             res_fail = client_poor.post(f"/confessions/{self.cid}/defense")
