@@ -6,6 +6,7 @@ from sqlmodel import Session, SQLModel, create_engine, select
 from sqlmodel.pool import StaticPool
 
 from config.database import get_session
+from config.settings import settings
 from main import app
 from src.models import (
     CoinTransaction,
@@ -202,7 +203,12 @@ class TestWeeklyLeaderboard(unittest.TestCase):
 
     def test_award_weekly_podium_rewards(self):
         """Test POST /api/leaderboard/award distributes coins and assigns weekly podium ranks."""
-        res = self.client.post("/api/leaderboard/award")
+        headers = {}
+        cron_sec = settings.CRON_SECRET.get_secret_value().strip()
+        if cron_sec:
+            headers["Authorization"] = f"Bearer {cron_sec}"
+
+        res = self.client.post("/api/leaderboard/award", headers=headers)
         self.assertEqual(res.status_code, 200)
         data = res.json()
         self.assertEqual(data["status"], "success")
