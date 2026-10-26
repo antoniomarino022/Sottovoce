@@ -1,4 +1,5 @@
-from typing import Any, cast,Optional
+import logging
+from typing import Any, Optional, cast
 
 from langchain_core.messages import AIMessage
 from langchain_core.prompts import ChatPromptTemplate
@@ -9,6 +10,7 @@ from src.agents.guardrails import (
     FALLBACK_RESPONSES,
     AgentName,
     enforce_triage_guardrails,
+    sanitize_prompt_input,
     validate_agent_output_guardrails,
     validate_input_guardrails,
 )
@@ -19,6 +21,8 @@ from src.agents.prompts import (
     triage_prompt,
 )
 from src.agents.state import ConfessionState, ModerationStateStatus, TriageResult
+
+logger = logging.getLogger(__name__)
 
 NO_DEFENSE_PLACEHOLDER = "Nessuna arringa presentata dalla difesa."
 
@@ -64,11 +68,21 @@ async def _run_persona(
     **prompt_vars: str,
 ) -> dict[str, Any]:
     """Invoke the creative LLM for a courtroom persona and sanitize its output."""
+    sanitized_vars = {
+        k: sanitize_prompt_input(v) if k != "escalation_instruction" else v
+        for k, v in prompt_vars.items()
+    }
     try:
-        messages = prompt.format_messages(**prompt_vars)
+        messages = prompt.format_messages(**sanitized_vars)
         response = await creative_llm.ainvoke(messages)
         raw_text = _as_text(response.content)
     except Exception:
+        logger.warning(
+            "Persona '%s' LLM invocation failed for confession_id=%s; using fallback.",
+            agent_name,
+            state.get("confession_id"),
+            exc_info=True,
+        )
         raw_text = FALLBACK_RESPONSES.get(agent_name, DEFAULT_FALLBACK)
 
     _, sanitized_text, output_violations = validate_agent_output_guardrails(
@@ -105,10 +119,11 @@ async def triage_node(state: ConfessionState) -> dict[str, Any]:
         )
 
     # LLM classification, then deterministic enforcement
+    safe_content = sanitize_prompt_input(content)
     try:
         structured_triage = triage_llm.with_structured_output(TriageResult)
         raw_output: Any = await structured_triage.ainvoke(
-            triage_prompt.format_messages(content=content)
+            triage_prompt.format_messages(content=safe_content)
         )
         raw_result: TriageResult = (
             TriageResult.model_validate(raw_output)
@@ -143,6 +158,12 @@ async def triage_node(state: ConfessionState) -> dict[str, Any]:
 
     # Fail closed: any triage error blocks the content
     except Exception as exc:
+        logger.warning(
+            "Triage LLM failed for confession_id=%s; engaging fail-closed crisis_held (%s).",
+            state.get("confession_id"),
+            exc,
+            exc_info=True,
+        )
         return _triage_update(
             mod_status="crisis_held",
             severity=10,

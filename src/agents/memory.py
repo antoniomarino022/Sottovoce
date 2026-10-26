@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 from typing import Any, AsyncGenerator, Optional
+import uuid
 
 from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.base import BaseCheckpointSaver
@@ -70,7 +71,11 @@ async def get_async_checkpointer() -> AsyncGenerator[Any, None]:
 
 
 def get_thread_config(confession_id: Optional[int | str] = None) -> RunnableConfig:
-    thread_id = f"confession_{confession_id}" if confession_id is not None else "confession_default"
+    """Return isolated LangGraph thread config; generates a unique ephemeral ID if confession_id is None."""
+    if confession_id is not None:
+        thread_id = f"confession_{confession_id}"
+    else:
+        thread_id = f"confession_ephemeral_{uuid.uuid4().hex}"
     return {"configurable": {"thread_id": thread_id}}
 
 

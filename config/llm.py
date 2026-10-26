@@ -8,7 +8,7 @@ _deepseek_key = settings.DEEPSEEK_API_KEY.get_secret_value() or "sk-not-configur
 
 triage_llm: ChatDeepSeek = ChatDeepSeek(
     model="deepseek-chat",
-    temperature=0.0,
+    temperature=0.4,
     timeout=6.0,
     max_retries=1,
     api_key=_deepseek_key,
