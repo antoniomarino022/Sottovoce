@@ -45,9 +45,8 @@ class Settings(BaseSettings):
         description="Public URL for Telegram Mini App",
     )
     BLOCK_ID: str = Field(
-        default=...,
-        validation_alias=AliasChoices("BLOCK_ID", "BLOCK_ID"),
-        description="Adsgram Block ID for rewarded ads (accepts BLOCK_ID or BLOCK_ID)",
+        default="",
+        description="Adsgram Block ID for rewarded ads",
     )
     CRON_SECRET: SecretStr = Field(
         default=SecretStr(""),

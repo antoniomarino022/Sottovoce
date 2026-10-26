@@ -427,11 +427,10 @@ let adsgramController = null;
 
 function getAdsgramController() {
   if (adsgramController) return adsgramController;
-  const blockId = String(window._BLOCK_ID || "55863").trim();
-  if (window.Adsgram && blockId) {
+  if (window.Adsgram && window.BLOCK_ID) {
     try {
       adsgramController = window.Adsgram.init({
-        blockId,
+        blockId: String(window.BLOCK_ID).trim(),
         debug: false,
       });
     } catch (e) {
