@@ -15,7 +15,6 @@ from src.models.enums import (
 if TYPE_CHECKING:
     from src.models.coin_transaction import CoinTransaction
     from src.models.reaction import Reaction
-    from src.models.report import Report
     from src.models.user import User
 
 
@@ -30,7 +29,6 @@ class Confession(SQLModel, table=True):
         sa.CheckConstraint("count_disagio >= 0", name="chk_confessions_count_disagio"),
         sa.CheckConstraint("count_popcorn >= 0", name="chk_confessions_count_popcorn"),
         sa.CheckConstraint("count_clown >= 0", name="chk_confessions_count_clown"),
-        sa.CheckConstraint("reports_count >= 0", name="chk_confessions_reports_count"),
         sa.CheckConstraint("shares_count >= 0", name="chk_confessions_shares_count"),
         sa.Index(
             "idx_public_feed",
@@ -155,10 +153,6 @@ class Confession(SQLModel, table=True):
         ),
     )
 
-    reports_count: int = Field(
-        default=0,
-        sa_column=Column(sa.Integer, nullable=False, server_default="0"),
-    )
     shares_count: int = Field(
         default=0,
         sa_column=Column(sa.Integer, nullable=False, server_default="0"),
@@ -182,10 +176,6 @@ class Confession(SQLModel, table=True):
         back_populates="confessions",
     )
     reactions: list["Reaction"] = Relationship(
-        back_populates="confession",
-        sa_relationship_kwargs={"cascade": "all, delete-orphan"},
-    )
-    reports: list["Report"] = Relationship(
         back_populates="confession",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"},
     )

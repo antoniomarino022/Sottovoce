@@ -18,12 +18,6 @@ from src.schemas.reaction import (
     ReactionResponse,
     ReactionToggleResponse,
 )
-from src.schemas.report import (
-    ReportCreate,
-    ReportCreateRequest,
-    ReportResolveRequest,
-    ReportResponse,
-)
 from src.schemas.user import (
     TelegramAuthRequest,
     UserCreate,
@@ -51,11 +45,6 @@ __all__ = [
     "ReactionResponse",
     "ReactionToggleResponse",
     "ConfessionReactionsSummary",
-    # Report
-    "ReportCreateRequest",
-    "ReportCreate",
-    "ReportResolveRequest",
-    "ReportResponse",
     # Coin Transaction
     "StarsPurchaseRequest",
     "CoinSpendRequest",

@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 from typing import Any, AsyncGenerator, Optional
 import uuid
@@ -10,6 +11,8 @@ from psycopg.rows import dict_row
 from psycopg_pool import AsyncConnectionPool
 
 from config.settings import settings
+
+logger = logging.getLogger(__name__)
 
 _pool: Optional[AsyncConnectionPool] = None
 _saver: Optional[Any] = None
@@ -53,13 +56,17 @@ def reset_checkpointer_for_testing(custom_saver: Optional[Any] = None) -> None:
     try:
         from src.agents.graph import reset_compiled_graphs
         reset_compiled_graphs()
-    except Exception:
-        pass
+    except ImportError:
+        logger.debug("graph module not importable; skipping compiled graph reset.")
 
 
 def get_checkpointer() -> Any:
     global _saver
     if _saver is None:
+        logger.warning(
+            "Checkpointer not initialised: falling back to in-memory saver "
+            "(state will NOT persist). Call init_checkpointer() at startup."
+        )
         _saver = MemorySaver()
     return _saver
 

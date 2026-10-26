@@ -24,7 +24,6 @@ HOTMIC_TABLES = {
     "users",
     "confessions",
     "reactions",
-    "reports",
     "coin_transactions",
     "poll_votes",
 }

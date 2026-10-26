@@ -6,10 +6,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     """Application configuration loaded from environment variables or .env file.
-
-    Sensitive fields use `SecretStr` to prevent accidental exposure
-    in logs, tracebacks, or API responses. To retrieve the raw string value:
-    `settings.DEEPSEEK_API_KEY.get_secret_value()`
+`
     """
 
     DEEPSEEK_API_KEY: SecretStr = Field(
@@ -47,10 +44,10 @@ class Settings(BaseSettings):
         default="https://sottovoce-sable.vercel.app",
         description="Public URL for Telegram Mini App",
     )
-    ADSGRAM_BLOCK_ID: str = Field(
+    BLOCK_ID: str = Field(
         default="55863",
-        validation_alias=AliasChoices("ADSGRAM_BLOCK_ID", "BLOCK_ID"),
-        description="Adsgram Block ID for rewarded ads (accepts ADSGRAM_BLOCK_ID or BLOCK_ID)",
+        validation_alias=AliasChoices("BLOCK_ID", "BLOCK_ID"),
+        description="Adsgram Block ID for rewarded ads (accepts BLOCK_ID or BLOCK_ID)",
     )
 
     @property

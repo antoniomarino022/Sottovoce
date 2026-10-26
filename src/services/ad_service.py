@@ -110,7 +110,7 @@ async def claim_share_reward_service(
 
     since_24h = datetime.now(timezone.utc) - timedelta(hours=24)
 
-    # 1. If sharing a specific confession, reward once per confession
+    #  If sharing a specific confession, reward once per confession
     if confession_id is not None:
         already_shared_post = session.exec(
             select(CoinTransaction.id)
@@ -150,7 +150,7 @@ async def claim_share_reward_service(
                 "message": "Hai già ricevuto le 20 🪙 di oggi! Riceverai altre +20 🪙 per ogni amico che entra dal tuo link.",
             }
 
-    # 2. Daily anti-spam cap across all shares
+    #  Daily anti-spam cap across all shares
     daily_count = session.exec(
         select(sa.func.count())
         .select_from(CoinTransaction)

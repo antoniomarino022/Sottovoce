@@ -90,7 +90,6 @@ class ConfessionResponse(BaseModel):
     count_popcorn: int
     count_clown: int
     total_reactions: Optional[int] = None
-    reports_count: int
     shares_count: int = 0
     user_reaction: Optional[ReactionType] = None
     is_author: Optional[bool] = None

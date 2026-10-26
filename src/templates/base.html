@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="{{ url_for('static', path='app.css') }}">
   <script>
     window.BOT_USERNAME = "{{ bot_username or 'SottovoceBot' }}";
-    window.ADSGRAM_BLOCK_ID = "{{ adsgram_block_id or '55863' }}";
+    window.BLOCK_ID = "{{ BLOCK_ID}}";
   </script>
   <script src="{{ url_for('static', path='htmx.min.js') }}" defer></script>
   <script src="{{ url_for('static', path='tg.js') }}" defer></script>

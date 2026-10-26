@@ -11,7 +11,6 @@ if TYPE_CHECKING:
     from src.models.confession import Confession
     from src.models.coin_transaction import CoinTransaction
     from src.models.reaction import Reaction
-    from src.models.report import Report
 
 
 class User(SQLModel, table=True):
@@ -120,10 +119,6 @@ class User(SQLModel, table=True):
     )
     reactions: list["Reaction"] = Relationship(
         back_populates="user",
-        sa_relationship_kwargs={"cascade": "all, delete-orphan"},
-    )
-    reports: list["Report"] = Relationship(
-        back_populates="reporter",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"},
     )
     transactions: list["CoinTransaction"] = Relationship(

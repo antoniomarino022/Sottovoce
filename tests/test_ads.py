@@ -123,7 +123,7 @@ class TestAdsgramRewards(unittest.TestCase):
         app.dependency_overrides[get_optional_current_user] = lambda: self.user
         feed_res = self.client.get("/")
         self.assertEqual(feed_res.status_code, 200)
-        self.assertIn('window.ADSGRAM_BLOCK_ID = "55863"', feed_res.text)
+        self.assertIn('window.BLOCK_ID = "55863"', feed_res.text)
 
     def test_share_game_and_confession_rewards_20_coins(self):
         """Test +20 coins awarded for sharing the game (/ads/share) and sharing a confession."""

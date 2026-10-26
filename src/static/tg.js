@@ -414,38 +414,20 @@ window.shareGame = function () {
     .catch(() => {});
 };
 
+window.shareApp = function () {
+  window.shareGame();
+};
+
 window.shareConfession = function (id, snippet) {
-  const bot = window.BOT_USERNAME || "SottovoceBot";
-  const ref = getReferralCode();
-  const startParam = ref ? `c${id}_${ref}` : `confession_${id}`;
-  const shareText = `Guarda questo segreto anonimo su Sottovoce! 🤫\n\n"${snippet}"\n\nScopri il verdetto della Corte:`;
-  const shareUrl = `https://t.me/${bot}/app?startapp=${encodeURIComponent(startParam)}`;
-
-  openTelegramShare(shareUrl, shareText);
-
-  fetch(`/confessions/${id}/share`, {
-    method: "POST",
-    headers: {
-      ...(tg?.initData ? { "X-Telegram-Init-Data": tg.initData } : {}),
-    },
-  })
-    .then((r) => r.json())
-    .then((data) => {
-      const el = document.getElementById(`shares-count-${id}`);
-      if (el && data?.shares_count) el.textContent = data.shares_count;
-      updateCoinsUI(data?.coins_balance);
-      if (data?.rewarded) {
-        tg?.HapticFeedback?.notificationOccurred("success");
-      }
-    })
-    .catch(() => {});
+  // Ora l'intera app viene condivisa anziché il singolo segreto
+  window.shareGame();
 };
 
 let adsgramController = null;
 
 function getAdsgramController() {
   if (adsgramController) return adsgramController;
-  const blockId = String(window.ADSGRAM_BLOCK_ID || "55863").trim();
+  const blockId = String(window._BLOCK_ID || "55863").trim();
   if (window.Adsgram && blockId) {
     try {
       adsgramController = window.Adsgram.init({

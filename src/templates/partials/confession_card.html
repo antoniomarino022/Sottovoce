@@ -41,18 +41,6 @@
         >
           {{ icon("trash", "size-4") }}
         </button>
-      {% else %}
-        <button
-          hx-post="/confessions/{{ c.id }}/reports"
-          hx-vals='{"reason": "abuse"}'
-          hx-target="this"
-          hx-swap="outerHTML"
-          hx-confirm="Vuoi segnalare questa confessione ai moderatori?"
-          class="text-hint active:text-danger p-1 text-[11px] flex items-center gap-1"
-          title="Segnala contenuto"
-        >
-          {{ icon("flag", "size-3.5") }}
-        </button>
       {% endif %}
     </div>
   </div>

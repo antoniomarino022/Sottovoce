@@ -14,7 +14,6 @@ from src.models import (
     CoinTransaction,
     Confession,
     ModerationStatus,
-    Report,
     User,
     UserStatus,
 )
@@ -101,59 +100,11 @@ class TestFeaturesAndRedis(unittest.TestCase):
         with Session(sqlite_engine) as session:
             for t in session.exec(select(CoinTransaction)).all():
                 session.delete(t)
-            for r in session.exec(select(Report)).all():
-                session.delete(r)
             for c in session.exec(select(Confession)).all():
                 session.delete(c)
             for u in session.exec(select(User)).all():
                 session.delete(u)
             session.commit()
-
-    def test_reporting_and_auto_moderation(self):
-        """Test user reporting, duplicate prevention, and auto-moderation threshold."""
-        client1 = TestClient(app, cookies={"sottovoce_session": "key_user_one"})
-        client2 = TestClient(app, cookies={"sottovoce_session": "key_user_two"})
-        client3 = TestClient(app, cookies={"sottovoce_session": "key_user_three"})
-
-        # 1. User 2 reports confession
-        res1 = client2.post(
-            f"/confessions/{self.cid}/reports",
-            json={"reason": "abuse", "details": "Non fa ridere"},
-        )
-        self.assertEqual(res1.status_code, 201)
-        self.assertEqual(res1.json()["confession_id"], self.cid)
-
-        # 2. Duplicate report by User 2 is rejected
-        res_dup = client2.post(
-            f"/confessions/{self.cid}/reports",
-            json={"reason": "abuse"},
-        )
-        self.assertEqual(res_dup.status_code, 400)
-
-        # 3. User 1 reports confession (count = 2)
-        res2 = client1.post(
-            f"/confessions/{self.cid}/reports",
-            json={"reason": "violence"},
-        )
-        self.assertEqual(res2.status_code, 201)
-
-        with Session(sqlite_engine) as session:
-            db_conf = session.get(Confession, self.cid)
-            self.assertEqual(db_conf.reports_count, 2)
-            self.assertEqual(db_conf.mod_status, ModerationStatus.APPROVED)
-
-        # 4. User 3 reports confession (count = 3 -> reaches threshold!)
-        res3 = client3.post(
-            f"/confessions/{self.cid}/reports",
-            json={"reason": "hate_speech"},
-        )
-        self.assertEqual(res3.status_code, 201)
-
-        # Confession should now be auto-moderated to crisis_held
-        with Session(sqlite_engine) as session:
-            db_conf = session.get(Confession, self.cid)
-            self.assertEqual(db_conf.reports_count, 3)
-            self.assertEqual(db_conf.mod_status, ModerationStatus.CRISIS_HELD)
 
     def test_coins_deduction_for_powers(self):
         """Test that invoking defense and prosecution deducts coins and records transactions."""

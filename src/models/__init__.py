@@ -11,7 +11,6 @@ from src.models.enums import (
     pg_enum,
 )
 from src.models.reaction import Reaction
-from src.models.report import Report
 from src.models.user import User
 
 __all__ = [
@@ -28,6 +27,5 @@ __all__ = [
     "User",
     "Confession",
     "Reaction",
-    "Report",
     "CoinTransaction",
 ]

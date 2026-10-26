@@ -27,7 +27,6 @@ from src.routers import (
     leaderboard_router,
     pages_router,
     reaction_router,
-    report_router,
     telegram_router,
 )
 
@@ -97,7 +96,6 @@ app.include_router(pages_router)
 app.include_router(auth_router)
 app.include_router(confession_router)
 app.include_router(reaction_router)
-app.include_router(report_router)
 app.include_router(telegram_router)
 app.include_router(leaderboard_router)
 app.include_router(ad_router)

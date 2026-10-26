@@ -26,7 +26,7 @@ def _render_template(
     """Render a Jinja2 template with shared Mini App config and HTMX Vary headers."""
     merged_context = {
         "bot_username": settings.TELEGRAM_BOT_USERNAME,
-        "adsgram_block_id": settings.ADSGRAM_BLOCK_ID,
+        "BLOCK_ID": getattr(settings, "BLOCK_ID", settings.BLOCK_ID),
         **context,
     }
     resp = templates.TemplateResponse(

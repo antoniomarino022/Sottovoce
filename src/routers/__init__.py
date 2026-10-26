@@ -9,7 +9,6 @@ from src.routers.deps import (
 from src.routers.leaderboard import router as leaderboard_router
 from src.routers.pages import router as pages_router
 from src.routers.reaction import router as reaction_router
-from src.routers.report import router as report_router
 from src.routers.telegram import router as telegram_router
 
 __all__ = [
@@ -17,7 +16,6 @@ __all__ = [
     "auth_router",
     "confession_router",
     "reaction_router",
-    "report_router",
     "telegram_router",
     "leaderboard_router",
     "pages_router",

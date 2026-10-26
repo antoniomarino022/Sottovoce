@@ -23,16 +23,16 @@
     {% endfor %}
   </div>
 
-  <!-- Condividi e Contatore totale -->
+  <!-- Condividi App e Contatore totale -->
   <div class="flex items-center gap-2">
     <button
       type="button"
-      onclick="shareConfession({{ c.id }}, '{{ (c.content | replace('\'', '') | replace('\"', '') | replace('\n', ' '))[:80] }}')"
+      onclick="shareApp()"
       class="flex items-center gap-1 text-[11px] text-hint active:text-accent-text py-1 px-1.5 rounded transition-colors"
-      title="Condividi segreto"
+      title="Condividi Sottovoce"
     >
       {{ icon("send", "size-3.5") }}
-      <span id="shares-count-{{ c.id }}">{{ c.shares_count if c.shares_count and c.shares_count > 0 else 'Condividi +20 🪙' }}</span>
+      <span>Condividi App +20 🪙</span>
     </button>
 
     <span class="text-[11px] text-hint font-medium">
