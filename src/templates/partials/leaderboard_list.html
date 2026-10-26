@@ -30,8 +30,6 @@
                 #{{ item.rank }}
               </span>
             {% endif %}
-
-            <span class="text-hint">#{{ item.id }}</span>
           </div>
 
           <!-- Reward indicator for podium -->
@@ -53,21 +51,12 @@
           </div>
         {% endif %}
 
-        <!-- Footer Stats: Reactions or Shares -->
+        <!-- Footer Stats: Reactions -->
         <div class="flex items-center justify-between pt-2 border-t border-sep text-xs text-hint">
-          {% if active_type == 'shares' %}
-            <div class="flex items-center gap-1.5 font-medium text-text">
-              <span>🚀</span>
-              <span>{{ item.shares_count or 0 }} condivisioni</span>
-            </div>
-            <span>{{ item.total_reactions or 0 }} voti</span>
-          {% else %}
-            <div class="flex items-center gap-1.5 font-medium text-text">
-              <span>🔥</span>
-              <span>{{ item.total_reactions or 0 }} voti totali</span>
-            </div>
-            <span>{{ item.shares_count or 0 }} condivisioni</span>
-          {% endif %}
+          <div class="flex items-center gap-1.5 font-medium text-text">
+            <span>🔥</span>
+            <span>{{ item.total_reactions or 0 }} voti totali</span>
+          </div>
         </div>
       </article>
     {% endfor %}

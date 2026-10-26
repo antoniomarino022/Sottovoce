@@ -4,10 +4,9 @@
   {% set def_cnt = c.defense_count or 0 %}
   {% set pros_cnt = c.prosecution_count or 0 %}
 
-  <!-- Header: #id, court badges, and time -->
+  <!-- Header: court badges and time -->
   <div class="flex items-center justify-between text-xs text-hint">
     <div class="flex items-center gap-1.5 font-medium flex-wrap">
-      <span class="text-text">#{{ c.id }}</span>
       {% if c.weekly_rank == 1 %}
         <span class="text-accent-text font-bold text-[11px] bg-secondary px-1.5 py-0.5 rounded">🥇 1° Podio</span>
       {% elif c.weekly_rank == 2 %}
@@ -140,8 +139,4 @@
 
   <!-- Barra Reazioni HTMX -->
   {% include "partials/reaction_bar.html" %}
-
-  {% if user and user.coins_balance is defined %}
-    <span id="user-coins-display" hx-swap-oob="true" data-referral="{{ user.referral_code if user.referral_code else '' }}" class="user-coins-display text-xs text-hint font-medium pl-0.5">{{ user.coins_balance }} 🪙</span>
-  {% endif %}
 </article>

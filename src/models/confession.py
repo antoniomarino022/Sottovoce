@@ -43,12 +43,6 @@ class Confession(SQLModel, table=True):
             postgresql_where=sa.text("mod_status = 'approved' AND deleted_at IS NULL"),
         ),
         sa.Index(
-            "idx_shares_leaderboard",
-            sa.text("shares_count DESC"),
-            sa.text("created_at DESC"),
-            postgresql_where=sa.text("mod_status = 'approved' AND deleted_at IS NULL"),
-        ),
-        sa.Index(
             "idx_confessions_author",
             "author_id",
             sa.text("created_at DESC"),

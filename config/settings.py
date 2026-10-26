@@ -49,6 +49,10 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("BLOCK_ID", "BLOCK_ID"),
         description="Adsgram Block ID for rewarded ads (accepts BLOCK_ID or BLOCK_ID)",
     )
+    CRON_SECRET: SecretStr = Field(
+        default=SecretStr(""),
+        description="Authorization secret for Vercel Cron or external triggers",
+    )
 
     @property
     def is_serverless(self) -> bool:

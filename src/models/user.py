@@ -28,6 +28,11 @@ class User(SQLModel, table=True):
         default=None,
         primary_key=True,
     )
+    telegram_id: Optional[int] = Field(
+        default=None,
+        sa_column=Column(sa.BigInteger, unique=True, nullable=True, index=True),
+        description="Telegram user ID for bot notifications",
+    )
     user_key: str = Field(
         sa_column=Column(sa.CHAR(64), unique=True, nullable=False),
         description="HMAC-SHA256(telegram_id, secret)",

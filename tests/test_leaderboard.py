@@ -152,12 +152,11 @@ class TestWeeklyLeaderboard(unittest.TestCase):
         self.assertEqual(res404.status_code, 404)
 
     def test_api_leaderboard_rankings(self):
-        """Test GET /api/leaderboard returns ordered top secrets and top shares."""
+        """Test GET /api/leaderboard returns ordered top secrets."""
         res = self.client.get("/api/leaderboard")
         self.assertEqual(res.status_code, 200)
         data = res.json()
         self.assertIn("secrets", data)
-        self.assertIn("shares", data)
 
         # Check top secrets ordering by reactions: c1 (30), c2 (20), c3 (10)
         secrets = data["secrets"]
@@ -174,23 +173,8 @@ class TestWeeklyLeaderboard(unittest.TestCase):
         self.assertEqual(secrets[2]["rank"], 3)
         self.assertEqual(secrets[2]["reward_coins"], 100)
 
-        # Check top shares ordering: c2 (15), c3 (8), c1 (2)
-        shares = data["shares"]
-        self.assertGreaterEqual(len(shares), 3)
-        self.assertEqual(shares[0]["id"], self.c2_id)
-        self.assertEqual(shares[0]["rank"], 1)
-        self.assertEqual(shares[0]["reward_coins"], 200)
-
-        self.assertEqual(shares[1]["id"], self.c3_id)
-        self.assertEqual(shares[1]["rank"], 2)
-        self.assertEqual(shares[1]["reward_coins"], 150)
-
-        self.assertEqual(shares[2]["id"], self.c1_id)
-        self.assertEqual(shares[2]["rank"], 3)
-        self.assertEqual(shares[2]["reward_coins"], 100)
-
     def test_leaderboard_html_page_and_htmx(self):
-        """Test GET /leaderboard page rendering and HTMX tab swapping."""
+        """Test GET /leaderboard page rendering and HTMX list swapping."""
         # Authenticate user with a fresh user reference having id
         mock_user = User(
             id=self.u1_id,
@@ -206,18 +190,15 @@ class TestWeeklyLeaderboard(unittest.TestCase):
         # Full page
         res = self.client.get("/leaderboard")
         self.assertEqual(res.status_code, 200)
-        self.assertIn("Classifiche Settimanali", res.text)
-        self.assertIn("200 🪙", res.text)
-        self.assertIn("Top 10 Segreti", res.text)
-        self.assertIn("Top 10 Condivisioni", res.text)
+        self.assertIn("Classifiche", res.text)
 
-        # HTMX partial tab request for shares
+        # HTMX partial list request
         res_htmx = self.client.get(
-            "/leaderboard?type=shares",
+            "/leaderboard",
             headers={"HX-Request": "true", "HX-Target": "leaderboard-list"},
         )
         self.assertEqual(res_htmx.status_code, 200)
-        self.assertIn("condivisioni", res_htmx.text)
+        self.assertIn("voti totali", res_htmx.text)
 
     def test_award_weekly_podium_rewards(self):
         """Test POST /api/leaderboard/award distributes coins and assigns weekly podium ranks."""
@@ -229,31 +210,28 @@ class TestWeeklyLeaderboard(unittest.TestCase):
         with Session(sqlite_engine) as session:
             # Check user1:
             # - Won 1st place in reactions: +200 coins
-            # - Won 3rd place in shares: +100 coins
             # - Initial balance: 50
-            # - Total balance: 50 + 200 + 100 = 350
+            # - Total balance: 50 + 200 = 250
             u1 = session.get(User, self.u1_id)
-            self.assertEqual(u1.coins_balance, 350)
+            self.assertEqual(u1.coins_balance, 250)
 
             # Check user2:
             # - Won 2nd place in reactions: +150 coins
-            # - Won 1st place in shares: +200 coins
             # - Initial balance: 50
-            # - Total balance: 50 + 150 + 200 = 400
+            # - Total balance: 50 + 150 = 200
             u2 = session.get(User, self.u2_id)
-            self.assertEqual(u2.coins_balance, 400)
+            self.assertEqual(u2.coins_balance, 200)
 
             # Check user3:
             # - Won 3rd place in reactions: +100 coins
-            # - Won 2nd place in shares: +150 coins
             # - Initial balance: 50
-            # - Total balance: 50 + 100 + 150 = 300
+            # - Total balance: 50 + 100 = 150
             u3 = session.get(User, self.u3_id)
-            self.assertEqual(u3.coins_balance, 300)
+            self.assertEqual(u3.coins_balance, 150)
 
             # Check transactions logged
             txs = session.exec(select(CoinTransaction).where(CoinTransaction.tx_type == TxType.WEEKLY_PODIUM)).all()
-            self.assertEqual(len(txs), 6)  # 3 for reactions podium + 3 for shares podium
+            self.assertEqual(len(txs), 3)  # 3 for reactions podium
 
             # Check confession weekly_rank set
             c1_db = session.get(Confession, self.c1_id)

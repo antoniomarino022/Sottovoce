@@ -8,6 +8,7 @@ from sqlmodel import Session, col, select
 
 from src.models import CoinTransaction, Confession, User
 from src.models.enums import ModerationStatus, TxType
+from src.services.notification_service import send_telegram_notification
 from src.services.redis_service import get_cache, invalidate_feed_cache, set_cache
 
 logger = logging.getLogger("sottovoce.leaderboard_service")
@@ -105,22 +106,6 @@ async def get_top_secrets_weekly(
     )
 
 
-async def get_top_shares_weekly(
-    session: Session,
-    limit: int = 10,
-    days: int = 7,
-) -> list[dict[str, Any]]:
-    """Retrieve top shared secrets of the week ordered by shares count."""
-    return await _get_weekly_leaderboard(
-        session,
-        metric_col=Confession.shares_count,
-        cache_prefix="shares",
-        limit=limit,
-        days=days,
-        include_weekly_rank=False,
-    )
-
-
 async def record_confession_share_service(
     session: Session,
     confession_id: int,
@@ -183,36 +168,43 @@ def _award_podium_group(
                 "coins_awarded": reward,
             }
         )
+
+        if author and author.telegram_id:
+            medal = {1: "🥇 1° Posto", 2: "🥈 2° Posto", 3: "🥉 3° Posto"}.get(rank, f"#{rank}")
+            import asyncio
+            asyncio.create_task(
+                send_telegram_notification(
+                    telegram_id=author.telegram_id,
+                    text=(
+                        f"🏆 <b>Sei salito sul Podio Settimanale!</b>\n\n"
+                        f"Congratulazioni! Il tuo segreto si è classificato al <b>{medal}</b>.\n"
+                        f"Hai vinto un premio di <b>+{reward} 🪙</b> monete!"
+                    ),
+                )
+            )
     return awards
 
 
 async def distribute_weekly_podium_rewards(
     session: Session,
 ) -> dict[str, Any]:
-    """Distribute weekly podium coin rewards (200 / 150 / 100) to top 3 reactions & shares."""
+    """Distribute weekly podium coin rewards (200 / 150 / 100) to top 3 reactions."""
     try:
         top_reactions = await get_top_secrets_weekly(session=session, limit=3, days=7)
         reaction_awards = _award_podium_group(
             session, top_reactions, assign_weekly_rank=True
         )
 
-        top_shares = await get_top_shares_weekly(session=session, limit=3, days=7)
-        shares_awards = _award_podium_group(
-            session, top_shares, assign_weekly_rank=False
-        )
-
         session.commit()
         await invalidate_feed_cache()
 
         logger.info(
-            "Weekly podium rewards distributed: %d reaction awards, %d share awards",
+            "Weekly podium rewards distributed: %d reaction awards",
             len(reaction_awards),
-            len(shares_awards),
         )
         return {
             "status": "success",
             "reactions_podium": reaction_awards,
-            "shares_podium": shares_awards,
         }
 
     except Exception as exc:

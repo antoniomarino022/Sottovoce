@@ -11,7 +11,6 @@ from src.routers.deps import get_optional_current_user
 from src.services.confession_service import get_feed_confessions_service
 from src.services.leaderboard_service import (
     get_top_secrets_weekly,
-    get_top_shares_weekly,
 )
 from src.templates import templates
 
@@ -77,19 +76,14 @@ async def index(
 @router.get("/leaderboard", response_class=HTMLResponse)
 async def leaderboard_page(
     request: Request,
-    type: str = Query("secrets", pattern=r"^(secrets|shares)$"),
     current_user: Optional[User] = Depends(get_optional_current_user),
     session: Session = Depends(get_session),
 ):
-    """Weekly leaderboard page (Top 10 Secrets or Top 10 Shares)."""
+    """Weekly leaderboard page (Top 10 Secrets)."""
     if not current_user:
         return RedirectResponse(url="/register", status_code=302)
 
-    items = (
-        await get_top_shares_weekly(session=session, limit=10, days=7)
-        if type == "shares"
-        else await get_top_secrets_weekly(session=session, limit=10, days=7)
-    )
+    items = await get_top_secrets_weekly(session=session, limit=10, days=7)
 
     is_tab_swap = (
         request.headers.get("hx-request")
@@ -104,7 +98,6 @@ async def leaderboard_page(
         template_name,
         {
             "items": items,
-            "active_type": type,
             "user": current_user,
         },
     )

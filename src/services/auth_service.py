@@ -96,6 +96,11 @@ class TelegramAuthService:
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail=f"User account is banned. Reason: {user.ban_reason or 'Violation of terms'}",
                 )
+            if user.telegram_id is None:
+                user.telegram_id = telegram_id
+                session.add(user)
+                session.commit()
+                session.refresh(user)
             return user, False
 
         referred_by_id = None
@@ -112,6 +117,7 @@ class TelegramAuthService:
 
         now = datetime.now(timezone.utc)
         user = User(
+            telegram_id=telegram_id,
             user_key=user_key,
             status=UserStatus.ACTIVE,
             coins_balance=50,

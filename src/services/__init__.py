@@ -11,7 +11,6 @@ from src.services.confession_service import (
 from src.services.leaderboard_service import (
     distribute_weekly_podium_rewards,
     get_top_secrets_weekly,
-    get_top_shares_weekly,
     record_confession_share_service,
 )
 from src.services.reaction_service import (
@@ -35,7 +34,6 @@ __all__ = [
     "get_user_reaction_service",
     "delete_reaction_service",
     "get_top_secrets_weekly",
-    "get_top_shares_weekly",
     "record_confession_share_service",
     "distribute_weekly_podium_rewards",
 ]

@@ -7,6 +7,7 @@ from sqlmodel import Session, select
 
 from src.models import Confession, Reaction
 from src.models.enums import ReactionType
+from src.services.notification_service import notify_confession_author
 
 logger = logging.getLogger("sottovoce.reaction_service")
 
@@ -87,6 +88,33 @@ async def create_or_toggle_reaction_service(
         session.commit()
         _refresh_if_expired(session, new_reaction)
         _refresh_if_expired(session, confession)
+
+        # Notifica Telegram all'autore per nuova reazione
+        if user_id != confession.author_id:
+            emoji_map = {
+                ReactionType.SKULL: "💀",
+                ReactionType.DISAGIO: "🫠",
+                ReactionType.POPCORN: "🍿",
+                ReactionType.CLOWN: "🤡",
+            }
+            emoji = emoji_map.get(reaction_type, "✨")
+            tot = confession.total_reactions or (
+                confession.count_skull
+                + confession.count_disagio
+                + confession.count_popcorn
+                + confession.count_clown
+            )
+            snippet = confession.content[:60] + "..." if len(confession.content) > 60 else confession.content
+            await notify_confession_author(
+                session=session,
+                confession_id=confession_id,
+                text=(
+                    f"{emoji} <b>Nuova reazione ricevuta!</b>\n\n"
+                    f"Qualcuno ha reagito con {emoji} al tuo segreto: <i>«{snippet}»</i>\n"
+                    f"Totale voti ricevuti: <b>{tot}</b>"
+                ),
+            )
+
         return new_reaction, confession, "created"
 
     except HTTPException:

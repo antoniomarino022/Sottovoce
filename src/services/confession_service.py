@@ -14,6 +14,7 @@ from src.agents import (
 from src.models import CoinTransaction, Confession, Reaction, User
 from src.models.enums import ModerationStatus, ShameBadge, TxType
 from src.schemas import ConfessionCreate
+from src.services.notification_service import notify_confession_author
 from src.services.redis_service import (
     get_cache,
     get_feed_version,
@@ -315,6 +316,19 @@ async def create_confession_service(
             session.commit()
             _refresh_if_expired(session, confession)
 
+            # Notifica autore sul verdetto della Corte
+            if confession.ai_roast and confession.mod_status == ModerationStatus.APPROVED:
+                snippet = confession.content[:60] + "..." if len(confession.content) > 60 else confession.content
+                await notify_confession_author(
+                    session=session,
+                    confession_id=cid,
+                    text=(
+                        f"⚖️ <b>La Corte ha emesso la sentenza!</b>\n\n"
+                        f"<i>\"{confession.ai_roast}\"</i>\n\n"
+                        f"Sul tuo segreto: <i>«{snippet}»</i>"
+                    ),
+                )
+
         await invalidate_feed_cache()
         return confession
 
@@ -456,6 +470,20 @@ async def _invoke_agent(
         session.add(confession)
         session.commit()
         _refresh_if_expired(session, confession)
+
+        # Invia notifica Telegram all'autore del segreto se difeso o accusato da altri
+        if user_id != confession.author_id:
+            action_title = "🛡️ Qualcuno ha invocato la tua Difesa!" if field == "ai_defense" else "⚔️ Qualcuno ha chiamato l'Accusa contro di te!"
+            snippet = confession.content[:60] + "..." if len(confession.content) > 60 else confession.content
+            await notify_confession_author(
+                session=session,
+                confession_id=confession_id,
+                text=(
+                    f"<b>{action_title}</b>\n\n"
+                    f"Il tuo segreto: <i>«{snippet}»</i> ha raggiunto {next_count} "
+                    f"{'sostenitori' if field == 'ai_defense' else 'accusatori'} in Aula!"
+                ),
+            )
 
         await invalidate_feed_cache()
         return confession
