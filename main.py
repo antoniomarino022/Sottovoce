@@ -61,6 +61,25 @@ async def lifespan(app: FastAPI):
 
         asyncio.create_task(_run_local_db_init())
 
+    # Garantisce che il Webhook Telegram sia sempre allineato e registrato su Vercel
+    token = settings.TELEGRAM_BOT_TOKEN.get_secret_value().strip()
+    webhook_url = settings.TELEGRAM_WEBHOOK_URL.strip()
+    if token and webhook_url:
+        async def _ensure_telegram_webhook():
+            try:
+                from aiogram import Bot
+                base = webhook_url.rstrip("/")
+                endpoint = base if base.endswith("/telegram/webhook") else f"{base}/telegram/webhook"
+                async with Bot(token=token) as bot:
+                    current_info = await bot.get_webhook_info()
+                    if current_info.url != endpoint:
+                        await bot.set_webhook(url=endpoint, drop_pending_updates=False)
+                        logger.info("Telegram webhook auto-registered to %s", endpoint)
+            except Exception as exc:
+                logger.warning("Could not auto-register Telegram webhook: %s", exc)
+
+        asyncio.create_task(_ensure_telegram_webhook())
+
     try:
         from src.agents.memory import init_checkpointer
         await init_checkpointer()
