@@ -13,6 +13,10 @@ class Settings(BaseSettings):
         default=SecretStr(""),
         description="DeepSeek API key used for safety triage and roast generation",
     )
+    OPENAI_API_KEY: SecretStr = Field(
+        default=SecretStr(""),
+        description="Optional OpenAI API key used as fallback if DeepSeek is unavailable",
+    )
     HMAC_SECRET_KEY: SecretStr = Field(
         default=SecretStr(""),
         description="Secret key for pseudonymous user_key derivation via HMAC-SHA256",
@@ -33,7 +37,7 @@ class Settings(BaseSettings):
 
 
     TELEGRAM_BOT_USERNAME: str = Field(
-        default="sottovoce0_bot",
+        default="sottovoceTG_bot",
         description="Telegram bot username (without @) for Mini App deep links",
     )
     TELEGRAM_WEBHOOK_URL: str = Field(

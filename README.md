@@ -49,11 +49,11 @@ Il sistema unisce un feed di post anonimi a un motore di intelligenza artificial
 - **Cross-Platform:** Sincronizzazione trasparente dell'identità utente tra Web classica e Telegram Mini App.
 
 ### 2.2 Requisiti Non Funzionali & Sicurezza ("Anti-Grane")
-- **Zero PII nel Database:** L'identità dell'utente (username, Telegram ID, nome, telefono) non viene mai salvata in chiaro nel DB.
+- **Privacy-First & Pseudonimato Rigoroso:** Nessun nome, cognome, username o numero di telefono viene memorizzato. Ogni azione pubblica e confessione è collegata esclusivamente a una `user_key` pseudonima non invertibile (HMAC-SHA256). Il `telegram_id` è conservato nell'account unicamente per il recapito delle notifiche push transazionali del bot.
 - **Fail-Closed Moderation:** Se l'IA fallisce, va in timeout o solleva eccezioni, il post non riceve mai un roast automatico ed entra in regime cautelativo di sicurezza.
 - **Gestione Crisi (Safety First):** Rilevamento automatico di segnali di autolesionismo o pericolo con interruzione istantanea del roast e visualizzazione di risorse di supporto reali (es. Telefono Amico, 1522).
 - **Rate Limiting e Protezione API:** Prevenzione di script di spam e abuse per proteggere il budget delle chiamate LLM.
-- **Serverless-Ready Concurrency:** Connessioni database ottimizzate per ambienti serverless (Vercel) tramite connection pooling nativo di **Neon**.
+- **Serverless-Ready Concurrency:** Connessioni database ottimizzate per ambienti serverless (Vercel) tramite connection pooling nativo di **Neon** e `pool_pre_ping`.
 
 ---
 
@@ -73,8 +73,7 @@ sequenceDiagram
     Client->>Server: Invia dati di autenticazione crittografati
     Server->>Server: Valida firma Telegram con TELEGRAM_BOT_TOKEN
     Server->>Server: Calcola user_key = HMAC-SHA256(Telegram_ID, SECRET_KEY)
-    Note over Server: Il Telegram ID in chiaro viene SCARTATO immediatamente
-    Server->>DB: Recupera o registra utente tramite sola user_key
+    Server->>DB: Registra o associa user_key (e telegram_id per notifiche bot)
     Server-->>Client: Sessione su Cookie HTTP-only sicuro
 ```
 
@@ -87,7 +86,9 @@ Il server riceve l'ID Telegram dell'utente ed esegue la derivazione pseudonima:
 
 $$\text{user\_key} = \text{HMAC-SHA256}(\text{Telegram ID}, \text{SECRET\_KEY})$$
 
-- Il Telegram ID in chiaro viene **immediatamente scartato** dalla memoria. Nel database viene registrata esclusivamente la `user_key`.
+- Nessun dato identificativo (nome, cognome, username, telefono) viene memorizzato nel sistema.
+- Le confessioni, le reazioni e i voti nel feed sono collegati esclusivamente alla `user_key` e all'ID pseudonimo interno.
+- Il `telegram_id` è archiviato solo per permettere al bot di inoltrare le notifiche di sistema (es. verdetto del tribunale, convocazione in aula).
 - Le sessioni client utilizzano cookie `HTTP-only`, `Secure` e a breve scadenza.
 - Nessun tracciamento IP permanente viene memorizzato sui confessionisti.
 

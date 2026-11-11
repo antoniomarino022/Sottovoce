@@ -479,6 +479,7 @@ window.watchRewardedAd = function () {
       .show()
       .then(claimReward)
       .catch((result) => {
+        console.warn("Adsgram show error:", result);
         if (btn) btn.disabled = false;
         tg?.HapticFeedback?.notificationOccurred("warning");
         showNativeAlert(
@@ -489,8 +490,13 @@ window.watchRewardedAd = function () {
   } else {
     if (btn) btn.disabled = false;
     tg?.HapticFeedback?.notificationOccurred("warning");
-    showNativeAlert(
-      "Annuncio Adsgram non disponibile al momento. Riprova tra qualche secondo."
-    );
+    let reason = "Riprova tra qualche secondo.";
+    if (!window.BLOCK_ID || !String(window.BLOCK_ID).trim()) {
+      reason = "BLOCK_ID non configurato sul server (variabile d'ambiente vuota).";
+    } else if (!window.Adsgram) {
+      reason = "SDK Adsgram non caricato (script bloccato o rete).";
+    }
+    console.warn("Adsgram unavailable:", reason, window.BLOCK_ID);
+    showNativeAlert("Annuncio Adsgram non disponibile. " + reason);
   }
 };

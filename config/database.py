@@ -17,9 +17,9 @@ is_postgres = database_url.startswith("postgresql")
 connect_args = {"connect_timeout": 3} if is_postgres else {}
 
 if is_postgres and settings.is_serverless:
-    pool_kwargs = {"poolclass": NullPool}
+    pool_kwargs = {"poolclass": NullPool, "pool_pre_ping": True}
 elif is_postgres:
-    pool_kwargs = {"pool_size": 5, "max_overflow": 10, "pool_recycle": 240}
+    pool_kwargs = {"pool_size": 5, "max_overflow": 10, "pool_recycle": 240, "pool_pre_ping": True}
 else:
     pool_kwargs = {}
 

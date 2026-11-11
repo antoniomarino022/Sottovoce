@@ -304,10 +304,15 @@ async def create_confession_service(
         if confession.id is not None:
             cid = confession.id
             session.commit()
-            result = await run_confession_pipeline(
-                content=content_text,
-                confession_id=cid,
-            )
+            try:
+                result = await run_confession_pipeline(
+                    content=content_text,
+                    confession_id=cid,
+                )
+            except Exception as exc:
+                logger.exception("Unexpected error in confession pipeline for id=%s: %s", cid, exc)
+                result = {"mod_status": "crisis_held", "severity": 10, "ai_roast": None}
+
             confession = _get_active_confession(session, cid)
             confession.mod_status = ModerationStatus(result.get("mod_status", "crisis_held"))
             confession.severity = int(result.get("severity", 0))
@@ -316,18 +321,21 @@ async def create_confession_service(
             session.commit()
             _refresh_if_expired(session, confession)
 
-            # Notifica autore sul verdetto della Corte
+            # Notifica autore sul verdetto della Corte (resiliente ad eventuali blocchi del bot)
             if confession.ai_roast and confession.mod_status == ModerationStatus.APPROVED:
-                snippet = confession.content[:60] + "..." if len(confession.content) > 60 else confession.content
-                await notify_confession_author(
-                    session=session,
-                    confession_id=cid,
-                    text=(
-                        f"⚖️ <b>La Corte ha emesso la sentenza!</b>\n\n"
-                        f"<i>\"{confession.ai_roast}\"</i>\n\n"
-                        f"Sul tuo segreto: <i>«{snippet}»</i>"
-                    ),
-                )
+                try:
+                    snippet = confession.content[:60] + "..." if len(confession.content) > 60 else confession.content
+                    await notify_confession_author(
+                        session=session,
+                        confession_id=cid,
+                        text=(
+                            f"⚖️ <b>La Corte ha emesso la sentenza!</b>\n\n"
+                            f"<i>\"{confession.ai_roast}\"</i>\n\n"
+                            f"Sul tuo segreto: <i>«{snippet}»</i>"
+                        ),
+                    )
+                except Exception as exc:
+                    logger.warning("Failed to notify author for confession id=%s: %s", cid, exc)
 
         await invalidate_feed_cache()
         return confession
@@ -473,17 +481,20 @@ async def _invoke_agent(
 
         # Invia notifica Telegram all'autore del segreto se difeso o accusato da altri
         if user_id != confession.author_id:
-            action_title = "🛡️ Qualcuno ha invocato la tua Difesa!" if field == "ai_defense" else "⚔️ Qualcuno ha chiamato l'Accusa contro di te!"
-            snippet = confession.content[:60] + "..." if len(confession.content) > 60 else confession.content
-            await notify_confession_author(
-                session=session,
-                confession_id=confession_id,
-                text=(
-                    f"<b>{action_title}</b>\n\n"
-                    f"Il tuo segreto: <i>«{snippet}»</i> ha raggiunto {next_count} "
-                    f"{'sostenitori' if field == 'ai_defense' else 'accusatori'} in Aula!"
-                ),
-            )
+            try:
+                action_title = "🛡️ Qualcuno ha invocato la tua Difesa!" if field == "ai_defense" else "⚔️ Qualcuno ha chiamato l'Accusa contro di te!"
+                snippet = confession.content[:60] + "..." if len(confession.content) > 60 else confession.content
+                await notify_confession_author(
+                    session=session,
+                    confession_id=confession_id,
+                    text=(
+                        f"<b>{action_title}</b>\n\n"
+                        f"Il tuo segreto: <i>«{snippet}»</i> ha raggiunto {next_count} "
+                        f"{'sostenitori' if field == 'ai_defense' else 'accusatori'} in Aula!"
+                    ),
+                )
+            except Exception as exc:
+                logger.warning("Failed to notify author for court action on confession id=%s: %s", confession_id, exc)
 
         await invalidate_feed_cache()
         return confession
